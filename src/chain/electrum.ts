@@ -2,6 +2,7 @@ import { binToHex, cashAddressToLockingBytecode, sha256 } from "@bitauth/libauth
 import { assertP2pkh, type NetworkId } from "./address.ts";
 import type { SpendableCoin } from "./settle.ts";
 
+/** Public Fulcrum endpoints. The first that answers is used; the rest are fallbacks. */
 export const ELECTRUM_SERVERS: Record<NetworkId, string[]> = {
   chipnet: ["wss://chipnet.bch.ninja:50004", "wss://chipnet.imaginary.cash:50004"],
   mainnet: [

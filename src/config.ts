@@ -17,7 +17,7 @@ export const PRIZE_ADDRESS_IS_PLACEHOLDER = false;
 
 /** Widget Factory slide deck from the BCH BLAZE brief. */
 export const WIDGET_FACTORY_SLIDES_URL =
-  "https://docs.google.com/presentation/d/1Yfuk9CJkf4U9M_WukcELhumWgj3Ak6345Ewy8hSp-Hk/edit?usp=sharing";
+  "https://docs.google.com/presentation/d/1St92HFWiFD4wyBWYELFyULkRgar4tIxR5mDxNvnGAys/edit?usp=sharing";
 
 /** Public repository. The banner links here. */
 export const PUBLIC_REPO_URL = "https://github.com/Mzee04/settlemany";
@@ -25,7 +25,11 @@ export const PUBLIC_REPO_URL = "https://github.com/Mzee04/settlemany";
 /** GitHub Pages site. Hash routes hang off this path. */
 export const PAGES_URL = "https://mzee04.github.io/settlemany/";
 
-/** ParyonUSD fungible category on Bitcoin Cash mainnet. 2 decimal places. */
+/**
+ * ParyonUSD fungible category on Bitcoin Cash mainnet. 2 decimal places.
+ * This is the canonical mainnet-v1 id from
+ * https://paryonusd.com/docs/technical/contract-verification.
+ */
 export const PUSD_CATEGORY_MAINNET =
   "2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544";
 

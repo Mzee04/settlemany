@@ -12,7 +12,7 @@ npm test
 npm run dev
 ```
 
-The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Chipnet is the default network so a mis-click does not spend mainnet coins. The Chipnet / Mainnet toggle is in the top bar on every screen. Chipnet addresses use the `bchtest:` prefix and coins are read and broadcast through chipnet Fulcrum (`wss://chipnet.bch.ninja:50004`, then `wss://chipnet.imaginary.cash:50004`). Mainnet uses `bitcoincash:` and mainnet Electrum. WizardConnect follows the same toggle: the connected wallet’s receive key is shown as a `bchtest:` address on chipnet and a `bitcoincash:` address on mainnet. Put Paytaca in chipnet mode before you scan the QR for a test, and in mainnet mode before a real payment.
+The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Mainnet is the default network so a judge can send a small real Bitcoin Cash payment. Chipnet stays available as Chipnet test in the top bar, or by opening the page with `?network=chipnet`. Mainnet coins are read and broadcast through Fulcrum at `wss://cashnode.bch.ninja:443`, `wss://electrum.imaginary.cash:50004`, and `wss://bch.imaginary.cash:50004`. Mainnet transactions and addresses open on the Bitcoin Unlimited explorer (`https://explorer.bitcoinunlimited.info`). Chipnet uses Fulcrum at `wss://chipnet.bch.ninja:50004` and `wss://chipnet.imaginary.cash:50004`. A mainnet page refuses a `bchtest:` address, and a chipnet page refuses a `bitcoincash:` address. WizardConnect follows the toggle: the connected wallet’s receive key is shown as a `bitcoincash:` address on mainnet and a `bchtest:` address on chipnet. PUSD is mainnet-only, category `2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544`, the canonical mainnet-v1 id published at [paryonusd.com contract verification](https://paryonusd.com/docs/technical/contract-verification).
 
 ```bash
 npm run lint
@@ -26,7 +26,7 @@ There is no server and no database. The ledger stays in `localStorage`. Signing 
 
 ## Prize address
 
-The banner at the top of every screen shows three slots: the Widget Factory slides, the public repo ([github.com/Mzee04/settlemany](https://github.com/Mzee04/settlemany)), and the CashTokens prize address.
+The banner at the top of every screen is a slim BCH BLAZE 2026 entry: Slides, Code, Vote with EMBER2026 and the CashTokens address, a copy button, and a line that it was built from 14 Nov 2026.
 
 `PRIZE_ADDRESS` is the token-aware form of the Paytaca address `bitcoincash:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rs2gwlru4z`, derived with libauth (`tokenSupport: true`):
 
@@ -34,9 +34,9 @@ The banner at the top of every screen shows three slots: the Widget Factory slid
 bitcoincash:zp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsdzapd623
 ```
 
-The banner shows that z address as the CashTokens prize address and the original q address next to it. Both lock the same P2PKH script.
+The banner shows that z address beside Vote with EMBER2026. The q address locks the same P2PKH script.
 
-The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a high-contrast ticket: factory hazard stripe, project name, the prize address, and BCH BLAZE 2026.
+The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a slim high-contrast ticket: factory hazard stripe, Slides, Code, the prize address, and built from 14 Nov 2026.
 
 ## Live proof
 
@@ -54,7 +54,7 @@ An earlier single-wallet send of $0.02 on the same network is [8068648f657eff370
 
 1. **Open the demo group.** “Eko Atlantic weekend” is already filled in: an apartment split equally, dinner by shares, a boat split equally, and suya by percent. The net is three payments to Adaeze, in integer cents.
 2. **Simulate the one transaction.** Public demo keys sign a transaction with pretend coins. libauth’s virtual machine checks it. The receipt shows the txid, the amounts, the fee, and an explorer link, and it is marked **not broadcast**. Download CSV and PDF, or copy the receipt link.
-3. **Send a real $0.10.** Connect Paytaca or Selene with WizardConnect, on the same network as the toggle. The default recipient is your own wallet, so the coins come back and you only pay the miner fee. Paste another address if you want the ten cents to move. Confirm the toggle before you sign: mainnet spends real BCH, and the page says so.
+3. **Send $0.02 on mainnet.** Connect Paytaca with WizardConnect. Mainnet is the default, and the page says this spends real Bitcoin Cash. The amount starts at $0.02. The default recipient is your own wallet, so the coins come back and you only pay the miner fee. Paste another `bitcoincash:` address if you want the payment to move.
 
 Demo keys are derived in public from the label `settlemany-public-demo-v1:<name>`. They are not secrets. Do not send funds to those addresses.
 
@@ -111,7 +111,7 @@ Paytaca’s public release notes say it signs P2PKH with `SIGHASH_UTXOS`, honors
 
 - `src/domain` — integer cents, splits, netting, the demo group
 - `src/chain` — addresses, the settlement builder, signing, Electrum, signing packets
-- `src/ui` — the banner, the ledger, the signing room, the $0.10 payment, receipts
+- `src/ui` — the banner, the ledger, the signing room, the small mainnet payment, receipts
 - `src/xo` — the XO template
 
 WizardConnect is LGPL-3.0. This application is MIT and links to it; changes to WizardConnect itself would stay under the LGPL.

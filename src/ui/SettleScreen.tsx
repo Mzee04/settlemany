@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PUSD_CATEGORY_CHIPNET, PUSD_CATEGORY_MAINNET } from "../config.ts";
-import { addressNetwork } from "../chain/address.ts";
+import { addressNetwork, assertAddressOnNetwork } from "../chain/address.ts";
 import { coinsForAddress, withElectrum } from "../chain/electrum.ts";
 import { encodePayload } from "../chain/envelope.ts";
 import { settlementToPacket, type PacketLeg, type SigningPacket } from "../chain/packet.ts";
@@ -30,6 +30,15 @@ export function SettleScreen({ group }: { group: Group }) {
 
   const names = Object.fromEntries(group.members.map((member) => [member.id, member.name]));
   const addresses = Object.fromEntries(group.members.map((member) => [member.id, member.address]));
+  const mismatched = group.members.filter((member) => {
+    const address = member.address.trim();
+    if (!address) return false;
+    try {
+      return addressNetwork(address) !== store.network;
+    } catch {
+      return true;
+    }
+  });
 
   function legs(): PacketLeg[] {
     return net.transfers.map((transfer) => ({
@@ -161,7 +170,7 @@ export function SettleScreen({ group }: { group: Group }) {
       for (const transfer of chosen) {
         for (const id of [transfer.fromId, transfer.toId]) {
           if (!addresses[id]) throw new Error(`${names[id] ?? id} still needs a CashTokens address.`);
-          addressNetwork(addresses[id]);
+          assertAddressOnNetwork(addresses[id], store.network);
         }
       }
       const ownerIds = [...new Set(chosen.map((transfer) => transfer.fromId))];
@@ -237,8 +246,18 @@ export function SettleScreen({ group }: { group: Group }) {
             PUSD
           </button>
         </div>
-        <span className="muted">Network: {store.network}</span>
+        <span className="muted">Network: {store.network === "mainnet" ? "mainnet (real BCH)" : "chipnet test"}</span>
       </div>
+      {store.network === "mainnet" && (
+        <p className="alert warn" role="status">
+          Use a tiny dollar amount. This spends real Bitcoin Cash.
+        </p>
+      )}
+      {mismatched.length > 0 && (
+        <p className="alert" role="alert">
+          Mainnet will not pay a bchtest address and chipnet will not pay a bitcoincash address.
+        </p>
+      )}
       {asset === "bch" && (
         <label className="field">
           <span>BCH price in USD · {store.priceMessage}</span>
@@ -272,7 +291,12 @@ export function SettleScreen({ group }: { group: Group }) {
         <button className="btn primary" type="button" disabled={busy || net.transfers.length === 0} onClick={() => void simulate()}>
           Simulate the one transaction
         </button>
-        <button className="btn" type="button" disabled={busy || net.transfers.length === 0} onClick={() => void buildLive()}>
+        <button
+          className="btn"
+          type="button"
+          disabled={busy || net.transfers.length === 0 || mismatched.length > 0}
+          onClick={() => void buildLive()}
+        >
           Build a real signing link
         </button>
       </div>
@@ -307,7 +331,13 @@ export function SettleScreen({ group }: { group: Group }) {
         </p>
         <div className="row">
           {[...new Set(net.transfers.map((transfer) => transfer.fromId))].map((fromId) => (
-            <button key={fromId} className="btn ghost" type="button" disabled={busy} onClick={() => void buildLive(fromId)}>
+            <button
+              key={fromId}
+              className="btn ghost"
+              type="button"
+              disabled={busy || mismatched.length > 0}
+              onClick={() => void buildLive(fromId)}
+            >
               {names[fromId]} pays their share
             </button>
           ))}

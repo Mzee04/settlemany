@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { PAYTACA_ADDRESS, PRIZE_ADDRESS, PUBLIC_REPO_URL, WIDGET_FACTORY_SLIDES_URL } from "./config.ts";
+import { PRIZE_ADDRESS, PUBLIC_REPO_URL, WIDGET_FACTORY_SLIDES_URL } from "./config.ts";
 import { DEMO_GROUP_ID } from "./domain/demo.ts";
 import { useStore, StoreProvider } from "./state/store.tsx";
+import { QrCode } from "./ui/bits.tsx";
 import { GroupScreen } from "./ui/GroupScreen.tsx";
 import { Home } from "./ui/Home.tsx";
 import { JoinScreen } from "./ui/JoinScreen.tsx";
@@ -34,6 +35,7 @@ export default function App() {
 function Frame() {
   const store = useStore();
   const [hash, setHash] = useState(() => window.location.hash || "#/");
+  const [showPrizeQr, setShowPrizeQr] = useState(false);
   useEffect(() => {
     const onHash = () => setHash(window.location.hash || "#/");
     window.addEventListener("hashchange", onHash);
@@ -51,32 +53,33 @@ function Frame() {
         <div className="banner-stripe" aria-hidden="true" />
         <div className="banner-body">
           <div>
-            <p className="kicker">EMBER2026 · CashTokens prize address</p>
+            <p className="kicker">BCH BLAZE 2026 entry</p>
+            <p className="banner-links">
+              <a href={WIDGET_FACTORY_SLIDES_URL} target="_blank" rel="noreferrer">
+                Slides
+              </a>
+              <a href={PUBLIC_REPO_URL} target="_blank" rel="noreferrer">
+                Code
+              </a>
+            </p>
             <p className="prize">
-              <span>CashTokens</span>
+              <span>Vote with EMBER2026:</span>
               <code>{PRIZE_ADDRESS}</code>
               <button className="btn ghost" type="button" onClick={() => void navigator.clipboard.writeText(PRIZE_ADDRESS)}>
                 Copy
               </button>
+              <button
+                className="btn ghost"
+                type="button"
+                aria-pressed={showPrizeQr}
+                onClick={() => setShowPrizeQr((open) => !open)}
+              >
+                {showPrizeQr ? "Hide QR" : "QR"}
+              </button>
             </p>
-            <p className="prize">
-              <span>Paytaca</span>
-              <code>{PAYTACA_ADDRESS}</code>
-            </p>
-            <p className="banner-links">
-              <a href={WIDGET_FACTORY_SLIDES_URL} target="_blank" rel="noreferrer">
-                Widget Factory slides
-              </a>
-              {PUBLIC_REPO_URL ? (
-                <a href={PUBLIC_REPO_URL} target="_blank" rel="noreferrer">
-                  Public repo
-                </a>
-              ) : (
-                <span>Public repo: set PUBLIC_REPO_URL</span>
-              )}
-            </p>
+            {showPrizeQr && <QrCode value={PRIZE_ADDRESS} />}
+            <p className="banner-built">Built during BCH BLAZE (from 14 Nov 2026).</p>
           </div>
-          <p className="event">Settlemany · BCH BLAZE 2026</p>
         </div>
       </header>
       <nav className="nav">
@@ -85,11 +88,11 @@ function Frame() {
         </a>
         <div className="nav-actions">
           <div className="seg" role="group" aria-label="Network">
-            <button type="button" aria-pressed={store.network === "chipnet"} onClick={() => store.setNetwork("chipnet")}>
-              Chipnet
-            </button>
             <button type="button" aria-pressed={store.network === "mainnet"} onClick={() => store.setNetwork("mainnet")}>
               Mainnet
+            </button>
+            <button type="button" aria-pressed={store.network === "chipnet"} onClick={() => store.setNetwork("chipnet")}>
+              Chipnet test
             </button>
           </div>
           <a className="btn ghost" href={`#/group/${DEMO_GROUP_ID}`}>
@@ -100,7 +103,7 @@ function Frame() {
       </nav>
       {store.network === "mainnet" && (
         <p className="alert warn" style={{ margin: 0, borderRadius: 0 }} role="status">
-          Mainnet is on. Settlements and the $0.10 action spend real Bitcoin Cash.
+          Mainnet is on. This spends real Bitcoin Cash. Use a tiny amount for a first test.
         </p>
       )}
       <main id="content">

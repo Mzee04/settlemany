@@ -26,13 +26,18 @@ export function Home() {
             transaction. Each debtor signs only their own inputs. Creditors are paid exactly, in PUSD or in BCH.
           </p>
           <div className="row" style={{ marginTop: "1rem" }}>
-            <a className="btn primary" href={`#/group/${DEMO_GROUP_ID}`}>
+            <a className="btn primary" href="#/pay">
+              {store.network === "mainnet" ? "Send a small amount on mainnet" : "Send a small chipnet test"}
+            </a>
+            <a className="btn" href={`#/group/${DEMO_GROUP_ID}`}>
               Open the demo group
             </a>
-            <a className="btn" href="#/pay">
-              Send a real $0.10
-            </a>
           </div>
+          <p className="muted">
+            {store.network === "mainnet"
+              ? "This spends real Bitcoin Cash. The demo group uses chipnet addresses."
+              : "Addresses start with bchtest:. ?network=chipnet shares that mode."}
+          </p>
         </div>
         <aside className="card">
           <h2>Eko Atlantic weekend</h2>

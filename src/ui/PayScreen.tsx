@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PUSD_CATEGORY_MAINNET } from "../config.ts";
-import { addressNetwork, lockingBytecodeForAddress } from "../chain/address.ts";
+import { assertAddressOnNetwork, lockingBytecodeForAddress } from "../chain/address.ts";
 import { broadcast, coinsForAddress, withElectrum } from "../chain/electrum.ts";
 import { encodePayload } from "../chain/envelope.ts";
 import { buildSettlement } from "../chain/settle.ts";
@@ -14,7 +14,7 @@ import { useWallet } from "./wallet.tsx";
 export function PayScreen() {
   const store = useStore();
   const wallet = useWallet();
-  const [dollars, setDollars] = useState("0.10");
+  const [dollars, setDollars] = useState("0.02");
   const [recipient, setRecipient] = useState("");
   const [asset, setAsset] = useState<"bch" | "pusd">("bch");
   const [message, setMessage] = useState<string | null>(null);
@@ -30,24 +30,25 @@ export function PayScreen() {
       return;
     }
     if (!Number.isFinite(cents) || cents <= 0) {
-      setMessage("Enter a dollar amount such as 0.10.");
+      setMessage("Enter a dollar amount such as 0.02.");
       return;
     }
     setBusy(true);
     try {
-      addressNetwork(target);
+      assertAddressOnNetwork(wallet.address, store.network);
+      assertAddressOnNetwork(target, store.network);
       const amount = asset === "pusd" ? BigInt(cents) : usdCentsToSats(cents, price);
-      if (asset === "bch" && price <= 0) throw new Error("Need a BCH price before converting $0.10.");
+      if (asset === "bch" && price <= 0) throw new Error("Need a BCH price before converting $0.02.");
       const category = asset === "pusd" ? PUSD_CATEGORY_MAINNET : undefined;
       if (asset === "pusd" && store.network !== "mainnet") {
-        throw new Error("PUSD lives on mainnet. Switch the toggle, or send the ten cents as BCH.");
+        throw new Error("PUSD lives on mainnet. Switch the toggle, or send the payment as BCH.");
       }
       const coins = await withElectrum(store.network, (client) => coinsForAddress(client, wallet.address!, "payer"));
       const built = buildSettlement({
         network: store.network,
         asset,
         tokenCategoryHex: category,
-        memo: "Settlemany $0.10 demo",
+        memo: "Settlemany $0.02 payment",
         transfers: [{ fromId: "payer", toId: "recipient", amount }],
         addresses: { payer: wallet.address, recipient: target },
         coins,
@@ -62,8 +63,8 @@ export function PayScreen() {
       const hex = transactionHex(signed);
       const txid = await withElectrum(store.network, (client) => broadcast(client, hex));
       window.location.hash = `#/receipt/${encodePayload({
-        title: "Ten-cent demo",
-        memo: "Settlemany $0.10 demo",
+        title: "$0.02 payment",
+        memo: "Settlemany $0.02 payment",
         network: store.network,
         asset,
         txid,
@@ -105,15 +106,14 @@ export function PayScreen() {
       <p className="muted">
         <a href="#/">Home</a>
       </p>
-      <h1>Send a real $0.10</h1>
+      <h1>{store.network === "mainnet" ? "Send Bitcoin Cash on mainnet" : "Send a chipnet test"}</h1>
       <p className="lede">
-        This is the small mainnet-or-chipnet action a judge can do alone. The default recipient is your own wallet, so
-        the coins come back and you only pay the miner fee. Paste another CashTokens address if you want the ten cents
-        to actually move.
+        Connect Paytaca. Mainnet is real money, so start with a few cents. The default recipient is your own wallet, so
+        the coins come back and you only pay the miner fee. Paste another address if you want the payment to move.
       </p>
       {store.network === "mainnet" && (
         <p className="alert warn" role="status">
-          Mainnet is selected. This spends real Bitcoin Cash.
+          Mainnet is selected. This spends real Bitcoin Cash. A first test of a few cents is enough.
         </p>
       )}
       <div className="card">

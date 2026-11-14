@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { NetworkId } from "../chain/address.ts";
+import { resolveNetwork } from "../chain/network.ts";
 import { fetchBchUsdCents } from "../chain/prices.ts";
 import { createDemoGroup, DEMO_GROUP_ID } from "../domain/demo.ts";
 import type { Group } from "../domain/ledger.ts";
@@ -26,7 +27,12 @@ type Store = Saved & {
 const Ctx = createContext<Store | null>(null);
 
 function seed(): Saved {
-  return { network: "chipnet", groups: [createDemoGroup()], priceCents: null, demoDismissed: false };
+  return {
+    network: resolveNetwork(location.search),
+    groups: [createDemoGroup()],
+    priceCents: null,
+    demoDismissed: false,
+  };
 }
 
 function load(): Saved {
@@ -36,7 +42,7 @@ function load(): Saved {
     const parsed = JSON.parse(raw) as Saved;
     if (!Array.isArray(parsed.groups)) return seed();
     return {
-      network: parsed.network === "mainnet" ? "mainnet" : "chipnet",
+      network: resolveNetwork(location.search),
       groups: parsed.groups,
       priceCents: typeof parsed.priceCents === "number" ? parsed.priceCents : null,
       demoDismissed: Boolean(parsed.demoDismissed),
@@ -77,7 +83,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       ...saved,
       priceMessage,
-      setNetwork: (network) => setSaved((current) => ({ ...current, network })),
+      setNetwork: (network) => {
+        const params = new URLSearchParams(location.search);
+        params.set("network", network);
+        history.replaceState(null, "", `${location.pathname}?${params.toString()}${location.hash}`);
+        setSaved((current) => ({ ...current, network }));
+      },
       setPriceCents: (priceCents) => setSaved((current) => ({ ...current, priceCents })),
       refreshPrice,
       saveGroup: (group) =>

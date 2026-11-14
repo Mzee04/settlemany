@@ -13,11 +13,11 @@ export function decodePayload<T>(payload: string): T {
 }
 
 export function explorerTxUrl(network: "chipnet" | "mainnet", txid: string): string {
-  const suffix = network === "chipnet" ? "?network=chipnet" : "";
-  return `https://explorer.selene.cash/tx/${txid}${suffix}`;
+  if (network === "chipnet") return `https://explorer.selene.cash/tx/${txid}?network=chipnet`;
+  return `https://explorer.bitcoinunlimited.info/tx/${txid}`;
 }
 
 export function explorerAddressUrl(network: "chipnet" | "mainnet", address: string): string {
-  const suffix = network === "chipnet" ? "?network=chipnet" : "";
-  return `https://explorer.selene.cash/address/${address}${suffix}`;
+  if (network === "chipnet") return `https://explorer.selene.cash/address/${address}?network=chipnet`;
+  return `https://explorer.bitcoinunlimited.info/address/${address}`;
 }
