@@ -285,9 +285,38 @@ const draft = {
   ],
 } as unknown as XOTemplate;
 
-export const settlemanyTemplate: XOTemplate = parseTemplate(draft);
+export const settlemanyTemplate: XOTemplate = deepFreeze(parseTemplate(draft));
 
-export const SETTLEMANY_TEMPLATE_IDENTIFIER = generateTemplateIdentifier(settlemanyTemplate);
+/**
+ * Wallet extensions often set `BigInt.prototype.toJSON` to a decimal string.
+ * `JSON.stringify` calls that before XO's replacer, so the template hash flips
+ * from the `<bigint: 0n>` form to the string `"0"`. Hash and sign while a
+ * canonical toJSON is installed, then put the previous one back.
+ */
+export function withCanonicalBigIntJson<T>(run: () => T): T {
+  const proto = BigInt.prototype as unknown as { toJSON?: () => string };
+  const previous = proto.toJSON;
+  proto.toJSON = function canonicalBigIntJson(this: bigint) {
+    return `<bigint: ${this.toString()}n>`;
+  };
+  try {
+    return run();
+  } finally {
+    if (previous === undefined) delete proto.toJSON;
+    else proto.toJSON = previous;
+  }
+}
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
+  Object.freeze(value);
+  for (const child of Object.values(value)) deepFreeze(child);
+  return value;
+}
+
+export const SETTLEMANY_TEMPLATE_IDENTIFIER = withCanonicalBigIntJson(() =>
+  generateTemplateIdentifier(settlemanyTemplate),
+);
 
 export const SETTLE_GROUP_ACTION = "settleGroup";
 
