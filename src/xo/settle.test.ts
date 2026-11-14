@@ -1,7 +1,9 @@
 import { sha256 } from "@bitauth/libauth";
 import { describe, expect, it } from "vitest";
 import { demoIdentity } from "../chain/address.ts";
-import { buildSettlement, type SpendableCoin } from "../chain/settle.ts";
+import { decodePayload, encodePayload } from "../chain/envelope.ts";
+import { settlementToPacket, type SigningPacket } from "../chain/packet.ts";
+import { buildSettlement, transactionHex, type BuiltSettlement, type SpendableCoin } from "../chain/settle.ts";
 import { signOwners, transactionId, verifySettlement } from "../chain/sign.ts";
 import {
   applyWalletUnlocks,
@@ -178,4 +180,101 @@ describe("XO group settlement", () => {
     });
     expect(invitationTransaction(compiled.invitation).outputs.some((output) => output.token?.amount === 250n)).toBe(true);
   });
+
+  it("round-trips a signing link when satoshi amounts were stored as decimal strings", () => {
+    const cases: { network: "mainnet" | "chipnet"; settlement: BuiltSettlement; memo: string }[] = [
+      {
+        network: "mainnet",
+        memo: "one debtor",
+        settlement: buildSettlement({
+          network: "mainnet",
+          asset: "bch",
+          transfers: [{ fromId: "ada", toId: "chidi", amount: 8_000n }],
+          addresses: {
+            ada: demoIdentity("ada", "mainnet").address,
+            chidi: demoIdentity("chidi", "mainnet").address,
+          },
+          coins: [
+            {
+              ...coin("ada", "ada-link", 50_000n),
+              lockingBytecode: demoIdentity("ada", "mainnet").lockingBytecode,
+            },
+          ],
+          memo: "one debtor",
+        }),
+      },
+      {
+        network: "chipnet",
+        memo: "token",
+        settlement: buildSettlement({
+          network: "chipnet",
+          asset: "pusd",
+          tokenCategoryHex: CATEGORY,
+          transfers: [{ fromId: "ada", toId: "chidi", amount: 250n }],
+          addresses,
+          coins: [coin("ada", "ada-link-token", 20_000n, 400n), coin("ada", "ada-link-fee", 20_000n)],
+          memo: "token",
+        }),
+      },
+    ];
+
+    for (const item of cases) {
+      const compiled = compileSettlementInvitation({
+        built: item.settlement,
+        network: item.network,
+        memo: item.memo,
+        coordinationMnemonic: COORDINATOR,
+      });
+      const flattened = compiled.invitation.replace(/"<bigint: (-?\d+)n>"/g, '"$1"');
+      expect(flattened).not.toContain("<bigint:");
+      const packet = linkPacket(item.settlement, item.network, flattened);
+      const opened = decodePayload<SigningPacket>(encodePayload(packet));
+      const signed = signOwners({
+        transaction: item.settlement.transaction,
+        sourceOutputs: item.settlement.sourceOutputs,
+        inputOwners: item.settlement.inputOwners,
+        keys: { ada: demoIdentity("ada", item.network).privateKey },
+      });
+      const withUnlocks = applyWalletUnlocks({
+        invitation: opened.xoInvitation ?? "",
+        transaction: signed,
+        network: item.network,
+        coordinationMnemonic: COORDINATOR,
+      });
+      expect(withUnlocks).toContain("<bigint:");
+      const updated = decodePayload<SigningPacket>(
+        encodePayload({ ...opened, txHex: transactionHex(signed), xoInvitation: withUnlocks }),
+      );
+      const recorded = recordInvitationResult({
+        invitation: updated.xoInvitation ?? "",
+        network: item.network,
+        coordinationMnemonic: COORDINATOR,
+        broadcasted: true,
+      });
+      const receipt = decodePayload<{ xoInvitation: string }>(encodePayload({ xoInvitation: recorded }));
+      const again = invitationTransaction(receipt.xoInvitation);
+      expect(again.outputs.some((output) => typeof output.valueSatoshis === "bigint")).toBe(true);
+      if (item.settlement.transaction.outputs.some((output) => output.token)) {
+        expect(again.outputs.some((output) => output.token?.amount === 250n)).toBe(true);
+      }
+    }
+  });
 });
+
+function linkPacket(settlement: BuiltSettlement, network: "mainnet" | "chipnet", invitation: string): SigningPacket {
+  return settlementToPacket({
+    built: settlement,
+    names: { ada: "Ada", chidi: "Chidi" },
+    groupId: "group",
+    groupName: "Group",
+    network,
+    asset: settlement.transaction.outputs.some((output) => output.token) ? "pusd" : "bch",
+    tokenCategoryHex: settlement.transaction.outputs.some((output) => output.token) ? CATEGORY : null,
+    memo: "link",
+    legs: [],
+    addresses: {},
+    demo: false,
+    builder: "xo",
+    xoInvitation: invitation,
+  });
+}
