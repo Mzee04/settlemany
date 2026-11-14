@@ -2,6 +2,7 @@ import {
   cashAddressToLockingBytecode,
   encodeLockingBytecodeP2pkh,
   hash160,
+  isPayToPublicKeyHash,
   lockingBytecodeToCashAddress,
   secp256k1,
   sha256,
@@ -28,6 +29,12 @@ export function addressNetwork(address: string): NetworkId {
   throw new Error(`Unsupported cashaddr prefix “${decoded.prefix}”`);
 }
 
+export function assertP2pkh(bytecode: Uint8Array): void {
+  if (!isPayToPublicKeyHash(bytecode)) {
+    throw new Error("Only P2PKH addresses can be spent. Contract and script outputs are left untouched.");
+  }
+}
+
 export function assertAddressOnNetwork(address: string, network: NetworkId): Uint8Array {
   const actual = addressNetwork(address);
   if (actual !== network) {
@@ -37,7 +44,9 @@ export function assertAddressOnNetwork(address: string, network: NetworkId): Uin
         : "That address is chipnet. Switch the network toggle, or paste a mainnet address (bitcoincash:).",
     );
   }
-  return lockingBytecodeForAddress(address);
+  const bytecode = lockingBytecodeForAddress(address);
+  assertP2pkh(bytecode);
+  return bytecode;
 }
 
 export function addressFromLockingBytecode(bytecode: Uint8Array, network: NetworkId): string {

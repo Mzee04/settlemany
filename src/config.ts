@@ -1,14 +1,29 @@
 /**
+ * Paytaca wallet address supplied for the EMBER2026 prize.
+ * This is the ordinary P2PKH form (q prefix, no token-type bit).
+ */
+export const PAYTACA_ADDRESS = "bitcoincash:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rs2gwlru4z";
+
+/**
  * EMBER2026 prize CashTokens address.
  *
- * Replace PRIZE_ADDRESS with your Paytaca CashTokens address before you
- * submit. It must be a mainnet cashaddr (bitcoincash:...) that can receive
- * CashTokens. The banner reads this constant and nothing else.
+ * Same locking script as PAYTACA_ADDRESS, encoded by libauth with
+ * tokenSupport so wallets know it can receive CashTokens (z prefix).
+ * Derived: bitcoincash:zp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsdzapd623
  */
-export const PRIZE_ADDRESS = "PASTE_YOUR_PAYTACA_CASHTOKENS_ADDRESS";
+export const PRIZE_ADDRESS = "bitcoincash:zp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsdzapd623";
 
-export const PRIZE_ADDRESS_IS_PLACEHOLDER =
-  PRIZE_ADDRESS === "PASTE_YOUR_PAYTACA_CASHTOKENS_ADDRESS";
+export const PRIZE_ADDRESS_IS_PLACEHOLDER = false;
+
+/** Widget Factory slide deck from the BCH BLAZE brief. */
+export const WIDGET_FACTORY_SLIDES_URL =
+  "https://docs.google.com/presentation/d/1Yfuk9CJkf4U9M_WukcELhumWgj3Ak6345Ewy8hSp-Hk/edit?usp=sharing";
+
+/**
+ * Public repository URL. Leave empty until the project is published.
+ * The banner always shows the slot.
+ */
+export const PUBLIC_REPO_URL = "";
 
 /** ParyonUSD fungible category on Bitcoin Cash mainnet. 2 decimal places. */
 export const PUSD_CATEGORY_MAINNET =

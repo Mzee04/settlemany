@@ -26,13 +26,15 @@ There is no server and no database. The ledger stays in `localStorage`. Signing 
 
 ## Prize address
 
-The banner at the top of every screen reads `PRIZE_ADDRESS` from [`src/config.ts`](src/config.ts). It is a placeholder until you paste your Paytaca CashTokens address:
+The banner at the top of every screen shows three slots: the Widget Factory slides, the public repo (`PUBLIC_REPO_URL`, empty until you publish), and the CashTokens prize address.
 
-```ts
-export const PRIZE_ADDRESS = "PASTE_YOUR_PAYTACA_CASHTOKENS_ADDRESS";
+`PRIZE_ADDRESS` is the token-aware form of the Paytaca address `bitcoincash:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rs2gwlru4z`, derived with libauth (`tokenSupport: true`):
+
+```text
+bitcoincash:zp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsdzapd623
 ```
 
-Use a mainnet `bitcoincash:` address that can receive CashTokens. The banner labels it EMBER2026.
+The banner shows that z address as the CashTokens prize address and the original q address next to it. Both lock the same P2PKH script.
 
 The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a high-contrast ticket: factory hazard stripe, project name, the prize address, and BCH BLAZE 2026.
 
@@ -76,7 +78,7 @@ These tests do not broadcast. The virtual machine checks the stateless rules chi
 
 ## What Paytaca and Selene need to support
 
-WizardConnect (`@wizardconnect/dapp`) is how the page talks to the wallet. The sign request sets `broadcast: false` and lists `inputPaths` only for the inputs that wallet should sign. For the one-transaction flow to finish, the wallet has to:
+WizardConnect (`@wizardconnect/dapp`) is how the page talks to the wallet. The sign request is built for Paytaca 1ee50a2 (`src/wallet/bch-sign.js` and `src/store/wizardconnect/actions.js`): `broadcast` is always `false` (omitting it makes Paytaca broadcast), `inputPaths` lists only that signer’s inputs as `[index, "receive"|"change", addressIndex]`, and the index is the child of the session xpub whose public key hashes to the coin. The signer’s own source outputs are sent with an empty unlocking script, because Paytaca silently skips a P2PKH input that already has one. Other inputs keep the signatures already collected. Only P2PKH coins are selected. For the one-transaction flow to finish, the wallet has to:
 
 1. Sign with `SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_UTXOS` (`0x61`), which the protocol already requires. Settlemany rejects any other sighash byte.
 2. Sign only the inputs named in `inputPaths`, including when other inputs belong to other people and are still unsigned.

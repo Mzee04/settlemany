@@ -4,6 +4,7 @@ import {
   encodeTransaction,
   flattenBinArray,
   hexToBin,
+  isPayToPublicKeyHash,
   utf8ToBin,
   type Input,
   type Output,
@@ -134,7 +135,9 @@ function selectCoins(
   const tokenChange = new Map<string, bigint>();
 
   for (const debtor of aggregated.debtors) {
-    const mine = request.coins.filter((coin) => coin.ownerId === debtor.id);
+    const mine = request.coins.filter(
+      (coin) => coin.ownerId === debtor.id && isPayToPublicKeyHash(coin.lockingBytecode),
+    );
     const picked: SpendableCoin[] = [];
     let tokenIn = 0n;
     if (request.asset === "pusd") {

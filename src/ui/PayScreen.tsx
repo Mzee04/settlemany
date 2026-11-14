@@ -141,7 +141,11 @@ export function PayScreen() {
           </p>
         )}
         <button className="btn primary" type="button" disabled={busy} onClick={() => void send()}>
-          {busy ? "Waiting on the wallet…" : "Sign and broadcast"}
+          {busy
+            ? "Waiting on the wallet…"
+            : store.network === "mainnet"
+              ? "Sign and broadcast on mainnet"
+              : "Sign and broadcast on chipnet"}
         </button>
         <p className="muted">
           Locking script check uses {wallet.address ? "your connected address" : "the address you connect"}.{" "}

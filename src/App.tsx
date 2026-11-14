@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PRIZE_ADDRESS, PRIZE_ADDRESS_IS_PLACEHOLDER } from "./config.ts";
+import { PAYTACA_ADDRESS, PRIZE_ADDRESS, PUBLIC_REPO_URL, WIDGET_FACTORY_SLIDES_URL } from "./config.ts";
 import { DEMO_GROUP_ID } from "./domain/demo.ts";
 import { useStore, StoreProvider } from "./state/store.tsx";
 import { GroupScreen } from "./ui/GroupScreen.tsx";
@@ -51,22 +51,30 @@ function Frame() {
         <div className="banner-stripe" aria-hidden="true" />
         <div className="banner-body">
           <div>
-            <p className="kicker">EMBER2026 · prize CashTokens address</p>
+            <p className="kicker">EMBER2026 · CashTokens prize address</p>
             <p className="prize">
-              <code className={PRIZE_ADDRESS_IS_PLACEHOLDER ? "placeholder" : undefined}>{PRIZE_ADDRESS}</code>
-              <button
-                className="btn ghost"
-                type="button"
-                onClick={() => void navigator.clipboard.writeText(PRIZE_ADDRESS)}
-              >
+              <span>CashTokens</span>
+              <code>{PRIZE_ADDRESS}</code>
+              <button className="btn ghost" type="button" onClick={() => void navigator.clipboard.writeText(PRIZE_ADDRESS)}>
                 Copy
               </button>
             </p>
-            {PRIZE_ADDRESS_IS_PLACEHOLDER && (
-              <p className="muted" style={{ color: "#f0b429", margin: "0.3rem 0 0" }}>
-                Replace PRIZE_ADDRESS in src/config.ts with your Paytaca address before you submit.
-              </p>
-            )}
+            <p className="prize">
+              <span>Paytaca</span>
+              <code>{PAYTACA_ADDRESS}</code>
+            </p>
+            <p className="banner-links">
+              <a href={WIDGET_FACTORY_SLIDES_URL} target="_blank" rel="noreferrer">
+                Widget Factory slides
+              </a>
+              {PUBLIC_REPO_URL ? (
+                <a href={PUBLIC_REPO_URL} target="_blank" rel="noreferrer">
+                  Public repo
+                </a>
+              ) : (
+                <span>Public repo: set PUBLIC_REPO_URL</span>
+              )}
+            </p>
           </div>
           <p className="event">Settlemany · BCH BLAZE 2026</p>
         </div>

@@ -1,5 +1,5 @@
 import { binToHex, cashAddressToLockingBytecode, sha256 } from "@bitauth/libauth";
-import type { NetworkId } from "./address.ts";
+import { assertP2pkh, type NetworkId } from "./address.ts";
 import type { SpendableCoin } from "./settle.ts";
 
 export const ELECTRUM_SERVERS: Record<NetworkId, string[]> = {
@@ -137,6 +137,7 @@ type RawUtxo = {
 export async function coinsForAddress(client: ElectrumClient, address: string, ownerId: string): Promise<SpendableCoin[]> {
   const decoded = cashAddressToLockingBytecode(address.trim());
   if (typeof decoded === "string") throw new Error(decoded);
+  assertP2pkh(decoded.bytecode);
   const result = await client.request("blockchain.scripthash.listunspent", [scriptHash(decoded.bytecode)]);
   if (!Array.isArray(result)) return [];
   const coins: SpendableCoin[] = [];
