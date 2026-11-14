@@ -113,7 +113,7 @@ export function SignScreen({ payload }: { payload: string }) {
       }
       const verified = verifySettlement(current.transaction, current.sourceOutputs);
       if (verified !== true) throw new Error(typeof verified === "string" ? verified : "The transaction does not verify.");
-      const txid = await withElectrum(live.network, async (client) => {
+      await withElectrum(live.network, async (client) => {
         const unspent: { txid: string; vout: number }[] = [];
         const ownersSeen = [...new Set(live.inputs.map((input) => input.ownerId))];
         for (const ownerId of ownersSeen) {
@@ -126,8 +126,30 @@ export function SignScreen({ payload }: { payload: string }) {
         if (stale.length > 0) {
           throw new Error("A coin in this transaction was already spent. Create a new signing link from the group so everyone can sign again.");
         }
-        return broadcast(client, live.txHex);
       });
+      let txid = "";
+      let note = "Broadcast through Settlemany's Electrum client.";
+      if (live.builder === "xo" && live.invitationIdentifier) {
+        try {
+          const xo = await import("../xo/encode.ts");
+          await xo.recordWalletSignatures({
+            network: live.network,
+            invitationIdentifier: live.invitationIdentifier,
+            transaction: current.transaction,
+          });
+          txid = await xo.broadcastXoInvitation({
+            network: live.network,
+            invitationIdentifier: live.invitationIdentifier,
+          });
+          note = "Broadcast through the XO engine.";
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "XO could not broadcast.";
+          txid = await withElectrum(live.network, (client) => broadcast(client, live.txHex));
+          note = `${reason} Broadcast through Settlemany's Electrum client.`;
+        }
+      } else {
+        txid = await withElectrum(live.network, (client) => broadcast(client, live.txHex));
+      }
       const group = store.groups.find((item) => item.id === live.groupId);
       if (group) {
         store.saveGroup({
@@ -177,7 +199,7 @@ export function SignScreen({ payload }: { payload: string }) {
           })),
         }),
         lines: live.legs.map((leg) => `${leg.fromName} paid ${leg.toName} ${formatUsd(leg.usdCents)}`),
-        note: "",
+        note,
       })}`;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Broadcast failed.");
@@ -199,7 +221,7 @@ export function SignScreen({ payload }: { payload: string }) {
         }
         return found;
       });
-      const built = buildSettlement({
+      const draft = buildSettlement({
         network: live.network,
         asset: live.asset,
         tokenCategoryHex: live.tokenCategoryHex ?? undefined,
@@ -208,6 +230,22 @@ export function SignScreen({ payload }: { payload: string }) {
         coins,
         memo: live.memo,
       });
+      let built = draft;
+      let xoNote = "";
+      const xoFields: Pick<SigningPacket, "builder" | "invitationIdentifier" | "xoTemplateIdentifier"> = {};
+      if (live.builder === "xo") {
+        try {
+          const xo = await import("../xo/encode.ts");
+          const encoded = await xo.encodeSettlementWithXo({ network: live.network, built: draft, memo: live.memo });
+          built = { ...draft, transaction: encoded.transaction };
+          xoFields.builder = "xo";
+          xoFields.invitationIdentifier = encoded.invitationIdentifier;
+          xoFields.xoTemplateIdentifier = encoded.templateIdentifier;
+        } catch (error) {
+          xoFields.builder = "classic";
+          xoNote = error instanceof Error ? ` ${error.message} Rebuilt with the classic builder.` : " Rebuilt with the classic builder.";
+        }
+      }
       const names = Object.fromEntries(live.inputs.map((input) => [input.ownerId, input.ownerName]));
       for (const leg of live.legs) names[leg.toId] = leg.toName;
       const next = settlementToPacket({
@@ -223,9 +261,10 @@ export function SignScreen({ payload }: { payload: string }) {
         addresses: live.addresses,
         demo: false,
       });
+      Object.assign(next, xoFields);
       setPacket(next);
       window.location.hash = `#/sign/${encodePayload(next)}`;
-      setMessage("Rebuilt without the spent coins. Earlier signatures no longer apply, so everyone signs again.");
+      setMessage(`Rebuilt without the spent coins. Earlier signatures no longer apply, so everyone signs again.${xoNote}`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not rebuild.");
     } finally {
@@ -241,6 +280,7 @@ export function SignScreen({ payload }: { payload: string }) {
       <p className="lede">
         {finishedOwners.length} of {owners.length} debtors have signed.{" "}
         {live.asset === "pusd" ? "Token settlement." : "BCH settlement."} {live.network}.
+        {live.builder === "xo" ? " Encoded by the XO engine. Broadcast from the browser that built the invitation so XO can send it." : ""}
       </p>
       <ul>
         {owners.map((ownerId) => (

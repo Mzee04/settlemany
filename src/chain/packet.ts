@@ -33,6 +33,10 @@ export type SigningPacket = {
   addresses: Record<string, string>;
   demo: boolean;
   createdAt: string;
+  /** Set when the XO engine encoded this transaction. Absent on older links. */
+  builder?: "xo" | "classic";
+  invitationIdentifier?: string;
+  xoTemplateIdentifier?: string;
 };
 
 export function settlementToPacket(args: {

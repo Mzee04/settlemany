@@ -1,19 +1,23 @@
-import { p2pkhTemplate } from "@xo-cash/templates";
 import { describe, expect, it } from "vitest";
 import { decodePayload, encodePayload } from "../chain/envelope.ts";
 import { settlemanyTemplate } from "./settlemanyTemplate.ts";
 
 describe("XO settlement template", () => {
-  it("matches the current XO template shape and commits signatures to every input", () => {
-    expect(Object.keys(settlemanyTemplate).sort()).toEqual(Object.keys(p2pkhTemplate).sort());
-    const scripts = settlemanyTemplate.scripts as { unlockP2PKH: string };
-    expect(scripts.unlockP2PKH).toContain("all_outputs_all_utxos");
-    const actions = settlemanyTemplate.actions as Record<string, { name: string; transaction?: string }>;
-    expect(actions.settleSatoshis?.name).toMatch(/Bitcoin Cash/);
-    expect(actions.settleFungibleTokens?.name).toMatch(/CashToken/);
-    const transactions = settlemanyTemplate.transactions as Record<string, unknown>;
-    expect(transactions[actions.settleSatoshis?.transaction ?? ""]).toBeTruthy();
-    expect(JSON.parse(JSON.stringify(settlemanyTemplate)).name).toBe("Settlemany settlement");
+  it("describes one multi-signer settlement and a creditor follow-up", () => {
+    expect(settlemanyTemplate.name).toBe("Settlemany group settlement");
+    expect(settlemanyTemplate.scripts.unlockP2PKH).toContain("all_outputs_all_utxos");
+    const settle = settlemanyTemplate.actions.settleGroup;
+    expect(settle?.transaction).toBe("groupSettlement");
+    expect(settle?.requirements?.participants).toEqual([
+      { role: "clerk", slots: { min: 1, max: 1 } },
+      { role: "debtor", slots: { min: 1 } },
+    ]);
+    expect(settlemanyTemplate.transactions?.groupSettlement?.version).toBe(2);
+    expect(settlemanyTemplate.transactions?.groupSettlement?.inputs).toEqual([{ input: "debtorInput" }]);
+    const followUps = settlemanyTemplate.lockingScripts.payeeLock?.actions ?? [];
+    expect(followUps.map((intent) => intent.action)).toContain("spendReceivedShare");
+    expect(settlemanyTemplate.actions.spendReceivedShare?.transaction).toBe("spendReceived");
+    expect(settlemanyTemplate.start[0]).toMatchObject({ action: "settleGroup", role: "clerk" });
   });
 });
 

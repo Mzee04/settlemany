@@ -79,6 +79,7 @@ export function ReceiptScreen({ payload }: { payload: string }) {
         <p>
           Fee {receipt.feeSats} sats · {receipt.network} · {receipt.asset.toUpperCase()}
         </p>
+        {receipt.note && <p>{receipt.note}</p>}
         {receipt.txid && (
           <p className="row">
             <a className="mono" href={explorerTxUrl(receipt.network, receipt.txid)} target="_blank" rel="noreferrer">

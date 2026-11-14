@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { PUSD_CATEGORY_CHIPNET, PUSD_CATEGORY_MAINNET } from "../config.ts";
-import { addressNetwork, assertAddressOnNetwork } from "../chain/address.ts";
+import { addressNetwork, assertAddressOnNetwork, type NetworkId } from "../chain/address.ts";
 import { coinsForAddress, withElectrum } from "../chain/electrum.ts";
 import { encodePayload } from "../chain/envelope.ts";
 import { settlementToPacket, type PacketLeg, type SigningPacket } from "../chain/packet.ts";
 import { replaceTransaction } from "../chain/packet.ts";
-import { buildSettlement, SettleError, type SpendableCoin } from "../chain/settle.ts";
+import { buildSettlement, SettleError, type BuiltSettlement, type SpendableCoin } from "../chain/settle.ts";
 import { signOwners, transactionId, verifySettlement } from "../chain/sign.ts";
 import { memberName, openTransfers, type Group } from "../domain/ledger.ts";
 import { formatBch, formatToken, formatUsd } from "../domain/money.ts";
@@ -15,6 +15,7 @@ import { CopyButton, QrCode } from "./bits.tsx";
 import { ShortfallNotice } from "./shortfall.tsx";
 import { pageUrl } from "./url.ts";
 import { chainAmount, DEMO_TOKEN_CATEGORY, demoKeys, pretendCoins } from "./plan.ts";
+import { setSettlementBuilder, settlementBuilder, type SettlementBuilder } from "../xo/preference.ts";
 
 export function SettleScreen({ group }: { group: Group }) {
   const store = useStore();
@@ -25,6 +26,8 @@ export function SettleScreen({ group }: { group: Group }) {
   const [shortfall, setShortfall] = useState<{ who: string; address: string; shortSats: bigint } | null>(null);
   const [busy, setBusy] = useState(false);
   const [packet, setPacket] = useState<SigningPacket | null>(null);
+  const [builder, setBuilder] = useState<SettlementBuilder>(settlementBuilder);
+  const [xoInvite, setXoInvite] = useState<string | null>(null);
   const typedPrice = Number(priceText);
   const priceCents = priceText.trim()
     ? Math.round(typedPrice * 100)
@@ -59,6 +62,39 @@ export function SettleScreen({ group }: { group: Group }) {
     }
   }
 
+  async function encodeWithBuilder(network: NetworkId, built: BuiltSettlement, memo: string): Promise<{
+    built: BuiltSettlement;
+    builder: SettlementBuilder;
+    invitationIdentifier?: string;
+    xoTemplateIdentifier?: string;
+    note: string | null;
+  }> {
+    if (builder !== "xo") {
+      setXoInvite(null);
+      return { built, builder: "classic", note: null };
+    }
+    try {
+      const { encodeSettlementWithXo } = await import("../xo/encode.ts");
+      const encoded = await encodeSettlementWithXo({ network, built, memo });
+      setXoInvite(encoded.serializedInvitation);
+      return {
+        built: { ...built, transaction: encoded.transaction },
+        builder: "xo",
+        invitationIdentifier: encoded.invitationIdentifier,
+        xoTemplateIdentifier: encoded.templateIdentifier,
+        note: null,
+      };
+    } catch (error) {
+      setXoInvite(null);
+      const reason = error instanceof Error ? error.message : "XO could not build this settlement.";
+      return {
+        built,
+        builder: "classic",
+        note: `${reason} The signing link uses the classic builder.`,
+      };
+    }
+  }
+
   async function simulate() {
     setBusy(true);
     setMessage(null);
@@ -82,7 +118,7 @@ export function SettleScreen({ group }: { group: Group }) {
         categoryHex: category ?? DEMO_TOKEN_CATEGORY,
         priceCents: asset === "bch" ? priceCents : 1,
       });
-      const built = buildSettlement({
+      const draft = buildSettlement({
         network,
         asset,
         tokenCategoryHex: category ?? undefined,
@@ -95,12 +131,23 @@ export function SettleScreen({ group }: { group: Group }) {
         coins,
         memo: group.name,
       });
+      const encoded = await encodeWithBuilder(network, draft, group.name);
+      const built = encoded.built;
       const signed = signOwners({
         transaction: built.transaction,
         sourceOutputs: built.sourceOutputs,
         inputOwners: built.inputOwners,
         keys,
       });
+      if (encoded.builder === "xo" && encoded.invitationIdentifier) {
+        const { recordWalletSignatures } = await import("../xo/encode.ts");
+        const serialized = await recordWalletSignatures({
+          network,
+          invitationIdentifier: encoded.invitationIdentifier,
+          transaction: signed,
+        });
+        setXoInvite(serialized);
+      }
       const verified = verifySettlement(signed, built.sourceOutputs);
       const made = replaceTransaction(
         settlementToPacket({
@@ -147,10 +194,13 @@ export function SettleScreen({ group }: { group: Group }) {
           })),
         }),
         lines: made.legs.map((leg) => `${leg.fromName} pays ${leg.toName} ${formatUsd(leg.usdCents)}`),
-        note:
-          asset === "pusd"
-            ? "Simulated test CashToken. This is not mainnet PUSD."
-            : "Signed with public demo keys.",
+        note: [
+          encoded.builder === "xo" ? "Simulated through the XO template. Not broadcast." : "Signed with public demo keys.",
+          asset === "pusd" ? "Simulated test CashToken. This is not mainnet PUSD." : "",
+          encoded.note ?? "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       })}`;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Simulation failed.");
@@ -185,7 +235,7 @@ export function SettleScreen({ group }: { group: Group }) {
         }
         return found;
       });
-      const built = buildSettlement({
+      const draft = buildSettlement({
         network: store.network,
         asset,
         tokenCategoryHex: category || undefined,
@@ -198,6 +248,8 @@ export function SettleScreen({ group }: { group: Group }) {
         coins,
         memo: group.name,
       });
+      const encoded = await encodeWithBuilder(store.network, draft, group.name);
+      const built = encoded.built;
       const made = settlementToPacket({
         built,
         names,
@@ -218,8 +270,15 @@ export function SettleScreen({ group }: { group: Group }) {
         addresses,
         demo: false,
       });
+      made.builder = encoded.builder;
+      made.invitationIdentifier = encoded.invitationIdentifier;
+      made.xoTemplateIdentifier = encoded.xoTemplateIdentifier;
       setPacket(made);
-      setMessage(onlyFromId ? `Signing link ready for ${names[onlyFromId]}.` : "Signing link ready. Each debtor opens it and signs only their inputs.");
+      const ready = onlyFromId
+        ? `Signing link ready for ${names[onlyFromId]}.`
+        : "Signing link ready. Each debtor opens it and signs only their inputs.";
+      const via = encoded.builder === "xo" ? " Built with XO." : "";
+      setMessage(`${ready}${via}${encoded.note ? ` ${encoded.note}` : ""}`);
     } catch (error) {
       if (error instanceof SettleError && error.code === "need-bch" && error.detail.shortSats !== undefined) {
         const debtorId = error.detail.debtorId ?? "";
@@ -262,6 +321,41 @@ export function SettleScreen({ group }: { group: Group }) {
         </div>
         <span className="muted">Network: {store.network === "mainnet" ? "mainnet (real BCH)" : "chipnet test"}</span>
       </div>
+      <div className="row" style={{ margin: "0.8rem 0" }}>
+        <div className="seg" role="group" aria-label="Transaction builder">
+          <button
+            type="button"
+            aria-pressed={builder === "xo"}
+            onClick={() => {
+              setBuilder("xo");
+              setSettlementBuilder("xo");
+            }}
+          >
+            XO
+          </button>
+          <button
+            type="button"
+            aria-pressed={builder === "classic"}
+            onClick={() => {
+              setBuilder("classic");
+              setSettlementBuilder("classic");
+              setXoInvite(null);
+            }}
+          >
+            Classic
+          </button>
+        </div>
+        <span className="muted">
+          {builder === "xo"
+            ? "The XO engine encodes the one transaction. Paytaca still signs each input."
+            : "The pre-XO builder. Use this when XO cannot cover the settlement."}
+        </span>
+      </div>
+      <p className="muted">
+        XO selects only coins its own account tracks, and its change helper returns every leftover satoshi to one
+        address, so Settlemany still chooses each debtor’s coins and change. Paytaca cannot join an XO invitation, so
+        the clerk records each wallet signature on the invitation. One tab can open XO on one network; reload to switch.
+      </p>
       {store.network === "mainnet" && (
         <p className="alert warn" role="status">
           Use a tiny dollar amount. This spends real Bitcoin Cash.
@@ -342,7 +436,17 @@ export function SettleScreen({ group }: { group: Group }) {
             <a className="btn" href={`#/sign/${encodePayload(packet)}`}>
               Open the signing room
             </a>
+            {xoInvite && <CopyButton value={xoInvite} label="Copy XO invitation" />}
           </div>
+          {packet.builder === "xo" && packet.xoTemplateIdentifier && (
+            <p className="muted">
+              Template <span className="mono">{packet.xoTemplateIdentifier}</span>. Paste the invitation into{" "}
+              <a href="https://blaze.xo.cash/" target="_blank" rel="noreferrer">
+                blaze.xo.cash
+              </a>
+              . The signing link itself stays the transaction the wallets sign.
+            </p>
+          )}
         </section>
       )}
       <section className="card" style={{ marginTop: "1rem" }}>
