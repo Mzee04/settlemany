@@ -48,13 +48,17 @@ Two Paytaca wallets on chipnet each signed only their own input, and one transac
 
 That transaction is the one-transaction claim on a public chain. Two real Paytaca iOS wallets, connected with WizardConnect, each signed only the input they owned. The sighash was `SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_UTXOS`, so each signature commits to every input and every output. The receiver was paid that exact amount. Nobody broadcast a second transaction to finish the split.
 
-An earlier single-wallet send of $0.02 on the same network is [8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47](https://explorer.selene.cash/tx/8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47?network=chipnet). A mainnet test is still to come.
+An earlier single-wallet send of $0.02 on the same network is [8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47](https://explorer.selene.cash/tx/8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47?network=chipnet). A mainnet send is [0c8a34f625da5073e8301f6c991dcb783d10ced6bc315e97242636d9cbe6c062](https://explorer.bitcoinunlimited.info/tx/0c8a34f625da5073e8301f6c991dcb783d10ced6bc315e97242636d9cbe6c062). Miner fee **264 sats**. The chipnet group settle above stays [10976994b4ffab36a9f6eb8d25459ca3451e5d65302e867e1076dbd46a0f5927](https://explorer.selene.cash/tx/10976994b4ffab36a9f6eb8d25459ca3451e5d65302e867e1076dbd46a0f5927?network=chipnet).
 
 ## What a judge can click
 
-1. **Open the demo group.** “Eko Atlantic weekend” is already filled in: an apartment split equally, dinner by shares, a boat split equally, and suya by percent. The net is three payments to Adaeze, in integer cents.
-2. **Simulate the one transaction.** Public demo keys sign a transaction with pretend coins. libauth’s virtual machine checks it. The receipt shows the txid, the amounts, the fee, and an explorer link, and it is marked **not broadcast**. Download CSV and PDF, or copy the receipt link.
-3. **Send $0.02 on mainnet.** Connect Paytaca with WizardConnect. Mainnet is the default, and the page says this spends real Bitcoin Cash. The amount starts at $0.02. The default recipient is your own wallet, so the coins come back and you only pay the miner fee. Paste another `bitcoincash:` address if you want the payment to move.
+1. **Send $0.02 on mainnet.** Connect Paytaca on mainnet. The form shows the balance of the connected address and a button to copy that address. A `bchtest:` address is rejected, and the send button stays off. After the wallet signs, the receipt says so and the full transaction id is the explorer link.
+2. **Open the demo group.** “Eko Atlantic weekend” is chipnet. It is already filled in: an apartment split equally, dinner by shares, a boat split equally, and suya by percent. The net is three payments to Adaeze, in integer cents. Those addresses start with `bchtest:`.
+3. **Simulate the one transaction.** Public demo keys sign a transaction with pretend coins. libauth’s virtual machine checks it. The receipt shows the txid, the amounts, the fee, and an explorer link, and it is marked **not broadcast**. Download CSV and PDF, or copy the receipt link.
+
+## Privacy
+
+There are no accounts. The ledger stays in this browser. Settlemany never asks for a seed phrase. WizardConnect returns a signature, not a key. When the page looks up coins or broadcasts, Fulcrum sees the address you asked about. A signing link contains the transaction. Pages links use `https://mzee04.github.io/settlemany/#/…`.
 
 Demo keys are derived in public from the label `settlemany-public-demo-v1:<name>`. They are not secrets. Do not send funds to those addresses.
 

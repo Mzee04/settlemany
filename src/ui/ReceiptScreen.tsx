@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { decodePayload, encodePayload, explorerTxUrl } from "../chain/envelope.ts";
-import { receiptPayments, type ReceiptPayment } from "../domain/receipt.ts";
+import { receiptPayments, receiptStatusLine, type ReceiptPayment } from "../domain/receipt.ts";
 import { CopyButton, downloadReceiptFiles } from "./bits.tsx";
 import { pageUrl } from "./url.ts";
 import type { NetworkId } from "../chain/address.ts";
@@ -67,8 +67,7 @@ export function ReceiptScreen({ payload }: { payload: string }) {
       </p>
       <h1>{receipt.title}</h1>
       <p className={receipt.broadcast ? "alert ok" : "alert warn"} role="status">
-        {receipt.broadcast ? "Broadcast." : "Not broadcast."} {receipt.verified}
-        {receipt.note ? ` ${receipt.note}` : ""}
+        {receiptStatusLine(receipt)}
       </p>
       <section className="card">
         <h2>{receipt.memo}</h2>
@@ -81,8 +80,11 @@ export function ReceiptScreen({ payload }: { payload: string }) {
           Fee {receipt.feeSats} sats · {receipt.network} · {receipt.asset.toUpperCase()}
         </p>
         {receipt.txid && (
-          <p>
-            <a href={explorerTxUrl(receipt.network, receipt.txid)}>View {receipt.txid.slice(0, 16)}… on the explorer</a>
+          <p className="row">
+            <a className="mono" href={explorerTxUrl(receipt.network, receipt.txid)} target="_blank" rel="noreferrer">
+              {receipt.txid}
+            </a>
+            <CopyButton value={receipt.txid} label="Copy transaction id" />
           </p>
         )}
         <div className="row">

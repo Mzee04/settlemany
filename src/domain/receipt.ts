@@ -41,6 +41,18 @@ export function usdFromCents(cents: number): string {
   return `${sign}${(abs / 100).toFixed(2)}`;
 }
 
+function sentence(value: string): string {
+  const text = value.trim();
+  if (!text) return "";
+  return /[.!?]$/.test(text) ? text : `${text}.`;
+}
+
+export function receiptStatusLine(input: { broadcast: boolean; verified: string; note?: string }): string {
+  const lead = input.broadcast ? "Sent." : "Not broadcast.";
+  const rest = [input.verified, input.note ?? ""].map(sentence).filter(Boolean);
+  return [lead, ...rest].join(" ");
+}
+
 export function receiptPayments(args: {
   date: string;
   group: string;

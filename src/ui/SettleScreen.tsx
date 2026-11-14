@@ -12,6 +12,7 @@ import { formatBch, formatToken, formatUsd } from "../domain/money.ts";
 import { receiptPayments } from "../domain/receipt.ts";
 import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
+import { ShortfallNotice } from "./shortfall.tsx";
 import { pageUrl } from "./url.ts";
 import { chainAmount, DEMO_TOKEN_CATEGORY, demoKeys, pretendCoins } from "./plan.ts";
 
@@ -21,6 +22,7 @@ export function SettleScreen({ group }: { group: Group }) {
   const [asset, setAsset] = useState<"bch" | "pusd">("bch");
   const [priceText, setPriceText] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [shortfall, setShortfall] = useState<{ who: string; address: string; shortSats: bigint } | null>(null);
   const [busy, setBusy] = useState(false);
   const [packet, setPacket] = useState<SigningPacket | null>(null);
   const typedPrice = Number(priceText);
@@ -60,6 +62,7 @@ export function SettleScreen({ group }: { group: Group }) {
   async function simulate() {
     setBusy(true);
     setMessage(null);
+    setShortfall(null);
     try {
       requirePrice();
       if (net.transfers.length === 0) throw new Error("Nothing to settle.");
@@ -146,8 +149,8 @@ export function SettleScreen({ group }: { group: Group }) {
         lines: made.legs.map((leg) => `${leg.fromName} pays ${leg.toName} ${formatUsd(leg.usdCents)}`),
         note:
           asset === "pusd"
-            ? "Simulated test CashToken. This is not mainnet PUSD, and it was not broadcast."
-            : "Signed with public demo keys. Not broadcast.",
+            ? "Simulated test CashToken. This is not mainnet PUSD."
+            : "Signed with public demo keys.",
       })}`;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Simulation failed.");
@@ -159,6 +162,7 @@ export function SettleScreen({ group }: { group: Group }) {
   async function buildLive(onlyFromId?: string) {
     setBusy(true);
     setMessage(null);
+    setShortfall(null);
     try {
       requirePrice();
       const chosen = onlyFromId ? net.transfers.filter((transfer) => transfer.fromId === onlyFromId) : net.transfers;
@@ -217,8 +221,18 @@ export function SettleScreen({ group }: { group: Group }) {
       setPacket(made);
       setMessage(onlyFromId ? `Signing link ready for ${names[onlyFromId]}.` : "Signing link ready. Each debtor opens it and signs only their inputs.");
     } catch (error) {
-      const text = error instanceof SettleError ? error.message : error instanceof Error ? error.message : "Could not build the transaction.";
-      setMessage(text);
+      if (error instanceof SettleError && error.code === "need-bch" && error.detail.shortSats !== undefined) {
+        const debtorId = error.detail.debtorId ?? "";
+        setShortfall({
+          who: names[debtorId] ?? debtorId,
+          address: addresses[debtorId] ?? "",
+          shortSats: error.detail.shortSats,
+        });
+        setMessage(null);
+      } else {
+        const text = error instanceof SettleError ? error.message : error instanceof Error ? error.message : "Could not build the transaction.";
+        setMessage(text);
+      }
     } finally {
       setBusy(false);
     }
@@ -304,6 +318,14 @@ export function SettleScreen({ group }: { group: Group }) {
         Simulation uses public demo keys and pretend coins, then checks the result in libauth. It is not broadcast. The
         real link asks each debtor’s wallet to sign only their inputs, with broadcast left off until everyone has signed.
       </p>
+      {shortfall && (
+        <ShortfallNotice
+          who={shortfall.who}
+          address={shortfall.address}
+          shortSats={shortfall.shortSats}
+          priceCents={priceCents}
+        />
+      )}
       {message && (
         <p className="alert" role="alert">
           {message}

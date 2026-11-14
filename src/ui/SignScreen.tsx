@@ -155,7 +155,7 @@ export function SignScreen({ payload }: { payload: string }) {
         network: live.network,
         asset: live.asset,
         txid,
-        verified: "Valid, then broadcast",
+        verified: "Every signature checked out and Settlemany broadcast it",
         broadcast: true,
         demo: false,
         feeSats: live.feeSats,
@@ -177,7 +177,7 @@ export function SignScreen({ payload }: { payload: string }) {
           })),
         }),
         lines: live.legs.map((leg) => `${leg.fromName} paid ${leg.toName} ${formatUsd(leg.usdCents)}`),
-        note: "Broadcast to the network.",
+        note: "",
       })}`;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Broadcast failed.");

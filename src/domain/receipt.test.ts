@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { receiptCsv, receiptPayments, receiptPdfLines, RECEIPT_HEADERS } from "./receipt.ts";
+import { receiptCsv, receiptPayments, receiptPdfLines, receiptStatusLine, RECEIPT_HEADERS } from "./receipt.ts";
 
 const payments = receiptPayments({
   date: "2026-11-14T01:40:00.000Z",
@@ -47,6 +47,24 @@ describe("receipt table", () => {
     expect(second).toContain("bchtest:zzh0srv55mem9nd8508llyuchm6e5vea9ylmynsfxy");
     expect(second?.includes(",437,")).toBe(false);
     expect(csv.split("Chipnet friends").length - 1).toBe(2);
+  });
+
+  it("says the wallet signed a send, and names the fee", () => {
+    expect(
+      receiptStatusLine({
+        broadcast: true,
+        verified: "Your wallet signed it and Settlemany broadcast it",
+        note: "You paid yourself, so only the 264-sat fee left the wallet.",
+      }),
+    ).toBe(
+      "Sent. Your wallet signed it and Settlemany broadcast it. You paid yourself, so only the 264-sat fee left the wallet.",
+    );
+    expect(
+      receiptStatusLine({
+        broadcast: false,
+        verified: "Valid on the Bitcoin Cash virtual machine",
+      }),
+    ).toBe("Not broadcast. Valid on the Bitcoin Cash virtual machine.");
   });
 
   it("does not repeat a title column in the PDF lines", () => {

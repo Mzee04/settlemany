@@ -57,13 +57,22 @@ export type BuiltSettlement = {
   payments: { ownerId: string; amount: bigint; satoshis: bigint }[];
 };
 
+export type SettleErrorDetail = {
+  shortSats?: bigint;
+  haveSats?: bigint;
+  needSats?: bigint;
+  debtorId?: string;
+};
+
 export class SettleError extends Error {
   readonly code: string;
+  readonly detail: SettleErrorDetail;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, detail: SettleErrorDetail = {}) {
     super(message);
     this.name = "SettleError";
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -169,10 +178,12 @@ function selectCoins(
     }
     if (sats < satsNeed) {
       const short = satsNeed - sats;
-      throw new SettleError(
-        "need-bch",
-        `${debtor.id} is short ${short.toString()} satoshis for their share of the payment, token dust, and fee.`,
-      );
+      throw new SettleError("need-bch", `Short ${short} satoshis for the payment, token dust, and miner fee.`, {
+        shortSats: short,
+        haveSats: sats,
+        needSats: satsNeed,
+        debtorId: debtor.id,
+      });
     }
     chosen.push(...picked);
   }

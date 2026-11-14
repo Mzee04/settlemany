@@ -66,7 +66,7 @@ function Frame() {
               <span>Vote with EMBER2026:</span>
               <code>{PRIZE_ADDRESS}</code>
               <button className="btn ghost" type="button" onClick={() => void navigator.clipboard.writeText(PRIZE_ADDRESS)}>
-                Copy
+                Copy vote address
               </button>
               <button
                 className="btn ghost"

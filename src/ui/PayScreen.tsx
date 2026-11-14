@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PUSD_CATEGORY_MAINNET } from "../config.ts";
 import { assertAddressOnNetwork, lockingBytecodeForAddress } from "../chain/address.ts";
 import { broadcast, coinsForAddress, withElectrum } from "../chain/electrum.ts";
 import { encodePayload } from "../chain/envelope.ts";
-import { buildSettlement } from "../chain/settle.ts";
+import { buildSettlement, SettleError } from "../chain/settle.ts";
 import { transactionHex } from "../chain/settle.ts";
 import { signWithWallet } from "../chain/wallet.ts";
-import { formatBch, formatUsd, usdCentsToSats } from "../domain/money.ts";
+import { formatBch, formatUsd, satsToUsdCents, usdCentsToSats } from "../domain/money.ts";
 import { receiptPayments } from "../domain/receipt.ts";
 import { useStore } from "../state/store.tsx";
+import { CopyButton } from "./bits.tsx";
+import { ShortfallNotice } from "./shortfall.tsx";
 import { useWallet } from "./wallet.tsx";
+
+type Balance =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ready"; sats: bigint }
+  | { kind: "error"; message: string };
 
 export function PayScreen() {
   const store = useStore();
@@ -18,15 +26,49 @@ export function PayScreen() {
   const [recipient, setRecipient] = useState("");
   const [asset, setAsset] = useState<"bch" | "pusd">("bch");
   const [message, setMessage] = useState<string | null>(null);
+  const [shortSats, setShortSats] = useState<bigint | null>(null);
   const [busy, setBusy] = useState(false);
+  const [balance, setBalance] = useState<Balance>({ kind: "idle" });
+  const request = useRef(0);
   const cents = Math.round(Number(dollars) * 100);
   const price = store.priceCents ?? 0;
   const target = recipient.trim() || wallet.address || "";
+  const recipientError = recipientProblem(recipient, store.network);
+
+  const loadBalance = useCallback(async (address: string) => {
+    const ticket = ++request.current;
+    setBalance({ kind: "loading" });
+    try {
+      const coins = await withElectrum(store.network, (client) => coinsForAddress(client, address, "payer"));
+      if (ticket !== request.current) return;
+      const sats = coins.reduce((sum, coin) => sum + coin.satoshis, 0n);
+      setBalance({ kind: "ready", sats });
+    } catch (error) {
+      if (ticket !== request.current) return;
+      setBalance({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Could not read this address.",
+      });
+    }
+  }, [store.network]);
+
+  useEffect(() => {
+    if (!wallet.address) return;
+    void loadBalance(wallet.address);
+    return () => {
+      request.current += 1;
+    };
+  }, [wallet.address, loadBalance]);
 
   async function send() {
     setMessage(null);
+    setShortSats(null);
     if (!wallet.manager || !wallet.address) {
       setMessage("Connect Paytaca or Selene first, on the same network as the toggle.");
+      return;
+    }
+    if (recipientError) {
+      setMessage(recipientError);
       return;
     }
     if (!Number.isFinite(cents) || cents <= 0) {
@@ -38,17 +80,17 @@ export function PayScreen() {
       assertAddressOnNetwork(wallet.address, store.network);
       assertAddressOnNetwork(target, store.network);
       const amount = asset === "pusd" ? BigInt(cents) : usdCentsToSats(cents, price);
-      if (asset === "bch" && price <= 0) throw new Error("Need a BCH price before converting $0.02.");
+      if (asset === "bch" && price <= 0) throw new Error("Need a BCH price before converting dollars to satoshis.");
       const category = asset === "pusd" ? PUSD_CATEGORY_MAINNET : undefined;
       if (asset === "pusd" && store.network !== "mainnet") {
-        throw new Error("PUSD lives on mainnet. Switch the toggle, or send the payment as BCH.");
+        throw new Error("PUSD lives on mainnet. Switch the toggle, or send this amount as BCH.");
       }
       const coins = await withElectrum(store.network, (client) => coinsForAddress(client, wallet.address!, "payer"));
       const built = buildSettlement({
         network: store.network,
         asset,
         tokenCategoryHex: category,
-        memo: "Settlemany $0.02 payment",
+        memo: "Settlemany payment",
         transfers: [{ fromId: "payer", toId: "recipient", amount }],
         addresses: { payer: wallet.address, recipient: target },
         coins,
@@ -62,23 +104,25 @@ export function PayScreen() {
       });
       const hex = transactionHex(signed);
       const txid = await withElectrum(store.network, (client) => broadcast(client, hex));
+      await loadBalance(wallet.address);
+      const fee = built.feeSats.toString();
       window.location.hash = `#/receipt/${encodePayload({
-        title: "$0.02 payment",
-        memo: "Settlemany $0.02 payment",
+        title: "Bitcoin Cash payment",
+        memo: "Settlemany payment",
         network: store.network,
         asset,
         txid,
-        verified: "Signed by your wallet and broadcast",
+        verified: "Your wallet signed it and Settlemany broadcast it",
         broadcast: true,
         demo: false,
-        feeSats: built.feeSats.toString(),
+        feeSats: fee,
         createdAt: new Date().toISOString(),
         payments: receiptPayments({
           date: new Date().toISOString(),
           group: "Settlemany payment",
           network: store.network,
           asset,
-          feeSats: built.feeSats.toString(),
+          feeSats: fee,
           txid,
           legs: [
             {
@@ -92,10 +136,19 @@ export function PayScreen() {
           ],
         }),
         lines: [`${formatUsd(cents)} to ${target}`, asset === "bch" ? formatBch(amount) : `${cents} PUSD units`],
-        note: target === wallet.address ? "You paid yourself, so only the fee left the wallet." : "Sent to the address you pasted.",
+        note:
+          target === wallet.address
+            ? `You paid yourself, so only the ${fee}-sat fee left the wallet.`
+            : "Sent to the address you pasted.",
       })}`;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The payment did not go out.");
+      if (wallet.address) await loadBalance(wallet.address);
+      if (error instanceof SettleError && error.code === "need-bch" && error.detail.shortSats !== undefined) {
+        setShortSats(error.detail.shortSats);
+        setMessage(null);
+      } else {
+        setMessage(error instanceof Error ? error.message : "The payment did not go out.");
+      }
     } finally {
       setBusy(false);
     }
@@ -117,27 +170,58 @@ export function PayScreen() {
         </p>
       )}
       <div className="card">
-        <p>
-          Wallet: {wallet.address ? <span className="mono">{wallet.address}</span> : "not connected"}
-        </p>
+        {wallet.address ? (
+          <p className="row">
+            <span className="mono">{wallet.address}</span>
+            <CopyButton value={wallet.address} label="Copy address" />
+          </p>
+        ) : (
+          <p>Not connected.</p>
+        )}
         {!wallet.address && (
           <button className="btn primary" type="button" onClick={wallet.connect}>
             Connect wallet
           </button>
         )}
-        <label className="field">
+        {wallet.address && balance.kind === "loading" && <p>Checking this address…</p>}
+        {wallet.address && balance.kind === "ready" && (
+          <p>
+            Balance of this address: {formatBch(balance.sats)}
+            {price > 0 ? ` · about ${formatUsd(satsToUsdCents(balance.sats, price))}` : ""}.
+            {balance.sats === 0n ? " No coins here yet. Send a few cents to this address first." : ""}
+          </p>
+        )}
+        {wallet.address && balance.kind === "error" && (
+          <p className="alert" role="alert">
+            {balance.message}
+          </p>
+        )}
+        {wallet.address && (
+          <p>
+            <button className="btn ghost" type="button" onClick={() => void loadBalance(wallet.address!)}>
+              Refresh balance
+            </button>
+          </p>
+        )}
+        <label className="field" htmlFor="pay-dollars">
           <span>Dollars</span>
-          <input value={dollars} onChange={(event) => setDollars(event.target.value)} inputMode="decimal" />
+          <input id="pay-dollars" value={dollars} onChange={(event) => setDollars(event.target.value)} inputMode="decimal" />
         </label>
-        <label className="field">
+        <label className="field" htmlFor="pay-recipient">
           <span>Recipient</span>
           <input
+            id="pay-recipient"
             value={recipient}
             onChange={(event) => setRecipient(event.target.value)}
             placeholder={wallet.address ?? "Leave blank to pay yourself"}
             spellCheck={false}
           />
         </label>
+        {recipientError && (
+          <p className="alert" role="alert">
+            {recipientError}
+          </p>
+        )}
         <div className="seg" role="group" aria-label="Asset">
           <button type="button" aria-pressed={asset === "bch"} onClick={() => setAsset("bch")}>
             BCH
@@ -150,12 +234,21 @@ export function PayScreen() {
           <p>{formatUsd(cents)} is about {formatBch(usdCentsToSats(cents, price))} at ${ (price / 100).toFixed(2) }.</p>
         )}
         <p className="muted">The wallet must be on {store.network}. WizardConnect is asked not to broadcast; Settlemany broadcasts after the signature checks out.</p>
+        {shortSats !== null && wallet.address && (
+          <ShortfallNotice who="This wallet" address={wallet.address} shortSats={shortSats} priceCents={price} />
+        )}
         {message && (
           <p className="alert" role="alert">
             {message}
           </p>
         )}
-        <button className="btn primary" type="button" disabled={busy} onClick={() => void send()}>
+        <button
+          className="btn primary"
+          type="button"
+          disabled={busy || recipientError !== null}
+          aria-busy={busy}
+          onClick={() => void send()}
+        >
           {busy
             ? "Waiting on the wallet…"
             : store.network === "mainnet"
@@ -169,6 +262,17 @@ export function PayScreen() {
       </div>
     </div>
   );
+}
+
+function recipientProblem(recipient: string, network: "chipnet" | "mainnet"): string | null {
+  const typed = recipient.trim();
+  if (!typed) return null;
+  try {
+    assertAddressOnNetwork(typed, network);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "That address is not on this network.";
+  }
 }
 
 function safe(address: string): string {
