@@ -14,7 +14,7 @@ import {
   type XONetwork,
 } from "@xo-cash/engine";
 import type { XOInvitation, XOInvitationInput, XOInvitationOutput } from "@xo-cash/types";
-import { deserializeInvitation, serializeInvitation } from "@xo-cash/utils";
+import { deserializeInvitation, fromExtendedJson, serializeInvitation, toExtendedJson } from "@xo-cash/utils";
 import type { NetworkId } from "../chain/address.ts";
 import { transactionHex, type BuiltSettlement } from "../chain/settle.ts";
 import {
@@ -119,7 +119,7 @@ export function applyWalletUnlocks(args: {
   coordinationMnemonic: string;
 }): string {
   const network = xoNetwork(args.network);
-  const current = deserializeInvitation(args.invitation);
+  const current = readInvitation(args.invitation);
   const crypto = openCrypto(args.coordinationMnemonic, network);
   try {
     if (!ownsInvitation(crypto, current)) return args.invitation;
@@ -156,7 +156,7 @@ export function recordInvitationResult(args: {
   broadcasted: boolean;
 }): string {
   const network = xoNetwork(args.network);
-  const current = deserializeInvitation(args.invitation);
+  const current = readInvitation(args.invitation);
   const crypto = openCrypto(args.coordinationMnemonic, network);
   try {
     if (!ownsInvitation(crypto, current)) return args.invitation;
@@ -202,9 +202,40 @@ export function recordInvitationResult(args: {
 }
 
 export function invitationTransaction(invitation: string): TransactionCommon {
-  const decoded = decodeTransaction(hexToBin(encodeInvitationTransaction(deserializeInvitation(invitation))));
+  const decoded = decodeTransaction(hexToBin(encodeInvitationTransaction(readInvitation(invitation))));
   if (typeof decoded === "string") throw new XoPathError("xo-decode", decoded);
   return decoded;
+}
+
+/**
+ * Signing links travel through JSON. A pass that drops XO's `<bigint: …n>` tags
+ * leaves satoshi and token amounts as decimal strings, and the engine then
+ * rejects the invitation. Restore those amounts before validation.
+ */
+function readInvitation(serialized: string): XOInvitation {
+  const revived = reviveInvitationNumbers(fromExtendedJson(serialized));
+  return deserializeInvitation(toExtendedJson(revived));
+}
+
+function reviveInvitationNumbers(value: unknown): unknown {
+  if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) return value.map(reviveInvitationNumbers);
+  if (!value || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(record)) {
+    if (isBigintField(key, record) && typeof child === "string" && /^-?\d+$/.test(child)) {
+      next[key] = BigInt(child);
+      continue;
+    }
+    next[key] = reviveInvitationNumbers(child);
+  }
+  return next;
+}
+
+function isBigintField(key: string, record: Record<string, unknown>): boolean {
+  if (key === "valueSatoshis") return true;
+  return key === "amount" && ("category" in record || "nft" in record);
 }
 
 function encodeInvitationTransaction(invitation: XOInvitation): string {
