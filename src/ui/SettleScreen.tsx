@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { XO_DEBUG_TOOL_URL } from "../config.ts";
 import { PUSD_CATEGORY_CHIPNET, PUSD_CATEGORY_MAINNET } from "../config.ts";
 import { addressNetwork, assertAddressOnNetwork } from "../chain/address.ts";
 import { coinsForAddress, withElectrum } from "../chain/electrum.ts";
@@ -15,6 +16,15 @@ import { CopyButton, QrCode } from "./bits.tsx";
 import { ShortfallNotice } from "./shortfall.tsx";
 import { pageUrl } from "./url.ts";
 import { chainAmount, DEMO_TOKEN_CATEGORY, demoKeys, pretendCoins } from "./plan.ts";
+import { coordinatorMnemonic } from "../xo/coordinator.ts";
+import { XoPathError, applyWalletUnlocks, compileSettlementInvitation, recordInvitationResult } from "../xo/settleInvitation.ts";
+
+type BuilderChoice = "xo" | "classic";
+
+function storedBuilder(): BuilderChoice {
+  const stored = localStorage.getItem("settlemany.builder");
+  return stored === "classic" ? "classic" : "xo";
+}
 
 export function SettleScreen({ group }: { group: Group }) {
   const store = useStore();
@@ -25,6 +35,7 @@ export function SettleScreen({ group }: { group: Group }) {
   const [shortfall, setShortfall] = useState<{ who: string; address: string; shortSats: bigint } | null>(null);
   const [busy, setBusy] = useState(false);
   const [packet, setPacket] = useState<SigningPacket | null>(null);
+  const [builder, setBuilder] = useState<BuilderChoice>(storedBuilder);
   const typedPrice = Number(priceText);
   const priceCents = priceText.trim()
     ? Math.round(typedPrice * 100)
@@ -95,12 +106,36 @@ export function SettleScreen({ group }: { group: Group }) {
         coins,
         memo: group.name,
       });
+      const phrase = builder === "xo" ? coordinatorMnemonic() : "";
+      let xoInvitation =
+        builder === "xo"
+          ? compileSettlementInvitation({
+              built,
+              network,
+              memo: group.name,
+              coordinationMnemonic: phrase,
+            }).invitation
+          : null;
       const signed = signOwners({
         transaction: built.transaction,
         sourceOutputs: built.sourceOutputs,
         inputOwners: built.inputOwners,
         keys,
       });
+      if (xoInvitation) {
+        xoInvitation = applyWalletUnlocks({
+          invitation: xoInvitation,
+          transaction: signed,
+          network,
+          coordinationMnemonic: phrase,
+        });
+        xoInvitation = recordInvitationResult({
+          invitation: xoInvitation,
+          network,
+          coordinationMnemonic: phrase,
+          broadcasted: false,
+        });
+      }
       const verified = verifySettlement(signed, built.sourceOutputs);
       const made = replaceTransaction(
         settlementToPacket({
@@ -115,6 +150,8 @@ export function SettleScreen({ group }: { group: Group }) {
           legs: legs(),
           addresses,
           demo: true,
+          builder,
+          xoInvitation,
         }),
         signed,
       );
@@ -151,9 +188,11 @@ export function SettleScreen({ group }: { group: Group }) {
           asset === "pusd"
             ? "Simulated test CashToken. This is not mainnet PUSD."
             : "Signed with public demo keys.",
+        xoInvitation,
       })}`;
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Simulation failed.");
+      const text = error instanceof Error ? error.message : "Simulation failed.";
+      setMessage(builder === "xo" ? `${text} The classic builder is still on this screen.` : text);
     } finally {
       setBusy(false);
     }
@@ -198,6 +237,15 @@ export function SettleScreen({ group }: { group: Group }) {
         coins,
         memo: group.name,
       });
+      const xoInvitation =
+        builder === "xo"
+          ? compileSettlementInvitation({
+              built,
+              network: store.network,
+              memo: group.name,
+              coordinationMnemonic: coordinatorMnemonic(),
+            }).invitation
+          : null;
       const made = settlementToPacket({
         built,
         names,
@@ -215,9 +263,11 @@ export function SettleScreen({ group }: { group: Group }) {
           usdCents: transfer.amountCents,
           amount: chainAmount(transfer.amountCents, asset, priceCents).toString(),
         })),
-        addresses,
-        demo: false,
-      });
+          addresses,
+          demo: false,
+          builder,
+          xoInvitation,
+        });
       setPacket(made);
       setMessage(onlyFromId ? `Signing link ready for ${names[onlyFromId]}.` : "Signing link ready. Each debtor opens it and signs only their inputs.");
     } catch (error) {
@@ -230,8 +280,12 @@ export function SettleScreen({ group }: { group: Group }) {
         });
         setMessage(null);
       } else {
-        const text = error instanceof SettleError ? error.message : error instanceof Error ? error.message : "Could not build the transaction.";
-        setMessage(text);
+        const text = error instanceof SettleError || error instanceof XoPathError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "Could not build the transaction.";
+        setMessage(builder === "xo" && !(error instanceof SettleError) ? `${text} The classic builder is still on this screen.` : text);
       }
     } finally {
       setBusy(false);
@@ -262,6 +316,36 @@ export function SettleScreen({ group }: { group: Group }) {
         </div>
         <span className="muted">Network: {store.network === "mainnet" ? "mainnet (real BCH)" : "chipnet test"}</span>
       </div>
+      <div className="row" style={{ margin: "0.8rem 0" }}>
+        <div className="seg" role="group" aria-label="Transaction builder">
+          <button
+            type="button"
+            aria-pressed={builder === "xo"}
+            onClick={() => {
+              setBuilder("xo");
+              localStorage.setItem("settlemany.builder", "xo");
+            }}
+          >
+            XO
+          </button>
+          <button
+            type="button"
+            aria-pressed={builder === "classic"}
+            onClick={() => {
+              setBuilder("classic");
+              localStorage.setItem("settlemany.builder", "classic");
+            }}
+          >
+            Classic
+          </button>
+        </div>
+        <span className="muted">{builder === "xo" ? "XO template" : "Previous builder"}</span>
+      </div>
+      <p className="muted">
+        {builder === "xo"
+          ? `XO encodes this settlement as one invitation. Paytaca still signs each debtor’s inputs through WizardConnect, because this XO release only signs keys its own account holds and only sees coins that account created. Open the invitation later in the XO debug tool (${XO_DEBUG_TOOL_URL}).`
+          : "Classic keeps the previous one-transaction builder, with the same sighash and the same WizardConnect signing."}
+      </p>
       {store.network === "mainnet" && (
         <p className="alert warn" role="status">
           Use a tiny dollar amount. This spends real Bitcoin Cash.

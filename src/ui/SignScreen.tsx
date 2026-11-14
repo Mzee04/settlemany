@@ -14,6 +14,8 @@ import { pageUrl } from "./url.ts";
 import { useWallet } from "./wallet.tsx";
 import { lockingBytecodeForAddress } from "../chain/address.ts";
 import { signWithWallet } from "../chain/wallet.ts";
+import { coordinatorMnemonic, existingCoordinatorMnemonic } from "../xo/coordinator.ts";
+import { applyWalletUnlocks, compileSettlementInvitation, recordInvitationResult } from "../xo/settleInvitation.ts";
 
 export function SignScreen({ payload }: { payload: string }) {
   const store = useStore();
@@ -89,6 +91,15 @@ export function SignScreen({ payload }: { payload: string }) {
         prompt: `Sign only your inputs for ${live.groupName}. Settlemany will broadcast after every debtor has signed.`,
       });
       const next = replaceTransaction(live, signed);
+      const mnemonic = existingCoordinatorMnemonic();
+      if (next.builder === "xo" && next.xoInvitation && mnemonic) {
+        next.xoInvitation = applyWalletUnlocks({
+          invitation: next.xoInvitation,
+          transaction: signed,
+          network: next.network,
+          coordinationMnemonic: mnemonic,
+        });
+      }
       setPacket(next);
       const link = pageUrl(`#/sign/${encodePayload(next)}`);
       window.location.hash = `#/sign/${encodePayload(next)}`;
@@ -128,6 +139,26 @@ export function SignScreen({ payload }: { payload: string }) {
         }
         return broadcast(client, live.txHex);
       });
+      let xoInvitation = live.xoInvitation ?? null;
+      const mnemonic = existingCoordinatorMnemonic();
+      if (live.builder === "xo" && xoInvitation && mnemonic) {
+        try {
+          xoInvitation = applyWalletUnlocks({
+            invitation: xoInvitation,
+            transaction: current.transaction,
+            network: live.network,
+            coordinationMnemonic: mnemonic,
+          });
+          xoInvitation = recordInvitationResult({
+            invitation: xoInvitation,
+            network: live.network,
+            coordinationMnemonic: mnemonic,
+            broadcasted: true,
+          });
+        } catch {
+          // The broadcast already succeeded. Keep the invitation from the build.
+        }
+      }
       const group = store.groups.find((item) => item.id === live.groupId);
       if (group) {
         store.saveGroup({
@@ -177,7 +208,8 @@ export function SignScreen({ payload }: { payload: string }) {
           })),
         }),
         lines: live.legs.map((leg) => `${leg.fromName} paid ${leg.toName} ${formatUsd(leg.usdCents)}`),
-        note: "",
+        note: live.builder === "xo" ? "Built with the Settlemany XO template. Paytaca signed the inputs." : "",
+        xoInvitation,
       })}`;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Broadcast failed.");
@@ -210,6 +242,16 @@ export function SignScreen({ payload }: { payload: string }) {
       });
       const names = Object.fromEntries(live.inputs.map((input) => [input.ownerId, input.ownerName]));
       for (const leg of live.legs) names[leg.toId] = leg.toName;
+      const useXo = live.builder === "xo";
+      const mnemonic = useXo ? (existingCoordinatorMnemonic() ?? coordinatorMnemonic()) : null;
+      const xoInvitation = useXo && mnemonic
+        ? compileSettlementInvitation({
+            built,
+            network: live.network,
+            memo: live.memo,
+            coordinationMnemonic: mnemonic,
+          }).invitation
+        : null;
       const next = settlementToPacket({
         built,
         names,
@@ -222,6 +264,8 @@ export function SignScreen({ payload }: { payload: string }) {
         legs: live.legs,
         addresses: live.addresses,
         demo: false,
+        builder: useXo && xoInvitation ? "xo" : "classic",
+        xoInvitation,
       });
       setPacket(next);
       window.location.hash = `#/sign/${encodePayload(next)}`;
@@ -241,6 +285,7 @@ export function SignScreen({ payload }: { payload: string }) {
       <p className="lede">
         {finishedOwners.length} of {owners.length} debtors have signed.{" "}
         {live.asset === "pusd" ? "Token settlement." : "BCH settlement."} {live.network}.
+        {live.builder === "xo" ? " Encoded with XO. Paytaca signs your inputs." : ""}
       </p>
       <ul>
         {owners.map((ownerId) => (

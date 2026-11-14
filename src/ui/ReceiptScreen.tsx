@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { XO_DEBUG_TOOL_URL } from "../config.ts";
 import { decodePayload, encodePayload, explorerTxUrl } from "../chain/envelope.ts";
 import { receiptPayments, receiptStatusLine, type ReceiptPayment } from "../domain/receipt.ts";
 import { CopyButton, downloadReceiptFiles } from "./bits.tsx";
@@ -19,6 +20,7 @@ type Receipt = {
   payments?: ReceiptPayment[];
   createdAt?: string;
   note?: string;
+  xoInvitation?: string | null;
 };
 
 export function ReceiptScreen({ payload }: { payload: string }) {
@@ -94,6 +96,20 @@ export function ReceiptScreen({ payload }: { payload: string }) {
           </button>
         </div>
       </section>
+      {receipt.xoInvitation && (
+        <section className="card">
+          <h2>XO invitation</h2>
+          <p>
+            This settlement was encoded from the Settlemany XO template. Paste the invitation into the{" "}
+            <a href={XO_DEBUG_TOOL_URL} target="_blank" rel="noreferrer">
+              XO debug tool
+            </a>
+            . Wallet signatures are on the transaction. They are also on the invitation when this browser still holds
+            the coordination key that created it.
+          </p>
+          <CopyButton value={receipt.xoInvitation} label="Copy XO invitation" />
+        </section>
+      )}
     </div>
   );
 }

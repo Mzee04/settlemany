@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { PRIZE_ADDRESS, PUBLIC_REPO_URL, WIDGET_FACTORY_SLIDES_URL } from "./config.ts";
+import {
+  CODE_AFTER_URL,
+  CODE_BEFORE_URL,
+  DEMO_AFTER_URL,
+  DEMO_BEFORE_URL,
+  PRIZE_ADDRESS,
+  WIDGET_FACTORY_SLIDES_URL,
+} from "./config.ts";
 import { DEMO_GROUP_ID } from "./domain/demo.ts";
 import { useStore, StoreProvider } from "./state/store.tsx";
 import { QrCode } from "./ui/bits.tsx";
@@ -58,8 +65,17 @@ function Frame() {
               <a href={WIDGET_FACTORY_SLIDES_URL} target="_blank" rel="noreferrer">
                 Slides
               </a>
-              <a href={PUBLIC_REPO_URL} target="_blank" rel="noreferrer">
-                Code
+              <a href={CODE_BEFORE_URL} target="_blank" rel="noreferrer">
+                Code before
+              </a>
+              <a href={CODE_AFTER_URL} target="_blank" rel="noreferrer">
+                Code after
+              </a>
+              <a href={DEMO_BEFORE_URL} target="_blank" rel="noreferrer">
+                Demo before
+              </a>
+              <a href={DEMO_AFTER_URL} target="_blank" rel="noreferrer">
+                Demo after
               </a>
             </p>
             <p className="prize">
@@ -78,7 +94,7 @@ function Frame() {
               </button>
             </p>
             {showPrizeQr && <QrCode value={PRIZE_ADDRESS} />}
-            <p className="banner-built">Built during BCH BLAZE (from 14 Nov 2026).</p>
+            <p className="banner-built">Settlemany was started on 14 Nov 2026, before the BCH BLAZE kickoff.</p>
           </div>
         </div>
       </header>

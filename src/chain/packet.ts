@@ -33,6 +33,10 @@ export type SigningPacket = {
   addresses: Record<string, string>;
   demo: boolean;
   createdAt: string;
+  /** `xo` when the transaction was encoded from the Settlemany XO invitation. */
+  builder?: "xo" | "classic";
+  /** Serialized XO invitation. Absent on links built before the XO path. */
+  xoInvitation?: string | null;
 };
 
 export function settlementToPacket(args: {
@@ -47,6 +51,8 @@ export function settlementToPacket(args: {
   legs: PacketLeg[];
   addresses: Record<string, string>;
   demo: boolean;
+  builder?: "xo" | "classic";
+  xoInvitation?: string | null;
 }): SigningPacket {
   return {
     v: 1,
@@ -79,6 +85,8 @@ export function settlementToPacket(args: {
     addresses: args.addresses,
     demo: args.demo,
     createdAt: new Date().toISOString(),
+    builder: args.builder ?? "classic",
+    xoInvitation: args.xoInvitation ?? null,
   };
 }
 
