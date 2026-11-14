@@ -11,6 +11,7 @@ import { memberName, openTransfers, type Group } from "../domain/ledger.ts";
 import { formatBch, formatToken, formatUsd } from "../domain/money.ts";
 import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
+import { pageUrl } from "./url.ts";
 import { chainAmount, DEMO_TOKEN_CATEGORY, demoKeys, pretendCoins } from "./plan.ts";
 
 export function SettleScreen({ group }: { group: Group }) {
@@ -196,7 +197,7 @@ export function SettleScreen({ group }: { group: Group }) {
     }
   }
 
-  const link = packet ? `${location.origin}${location.pathname}#/sign/${encodePayload(packet)}` : "";
+  const link = packet ? pageUrl(`#/sign/${encodePayload(packet)}`) : "";
 
   return (
     <div className="page">

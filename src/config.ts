@@ -19,11 +19,11 @@ export const PRIZE_ADDRESS_IS_PLACEHOLDER = false;
 export const WIDGET_FACTORY_SLIDES_URL =
   "https://docs.google.com/presentation/d/1Yfuk9CJkf4U9M_WukcELhumWgj3Ak6345Ewy8hSp-Hk/edit?usp=sharing";
 
-/**
- * Public repository URL. Leave empty until the project is published.
- * The banner always shows the slot.
- */
-export const PUBLIC_REPO_URL = "";
+/** Public repository. The banner links here. */
+export const PUBLIC_REPO_URL = "https://github.com/Mzee04/settlemany";
+
+/** GitHub Pages site. Hash routes hang off this path. */
+export const PAGES_URL = "https://mzee04.github.io/settlemany/";
 
 /** ParyonUSD fungible category on Bitcoin Cash mainnet. 2 decimal places. */
 export const PUSD_CATEGORY_MAINNET =

@@ -9,6 +9,7 @@ import { staleInputIndexes } from "../chain/stale.ts";
 import { formatUsd } from "../domain/money.ts";
 import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
+import { pageUrl } from "./url.ts";
 import { useWallet } from "./wallet.tsx";
 import { lockingBytecodeForAddress } from "../chain/address.ts";
 import { signWithWallet } from "../chain/wallet.ts";
@@ -88,7 +89,7 @@ export function SignScreen({ payload }: { payload: string }) {
       });
       const next = replaceTransaction(live, signed);
       setPacket(next);
-      const link = `${location.origin}${location.pathname}#/sign/${encodePayload(next)}`;
+      const link = pageUrl(`#/sign/${encodePayload(next)}`);
       window.location.hash = `#/sign/${encodePayload(next)}`;
       setMessage("Signed. If someone else still has to sign, send them the updated link.");
       void navigator.clipboard.writeText(link).catch(() => undefined);
@@ -214,7 +215,7 @@ export function SignScreen({ payload }: { payload: string }) {
     }
   }
 
-  const link = `${location.origin}${location.pathname}#/sign/${encodePayload(live)}`;
+  const link = pageUrl(`#/sign/${encodePayload(live)}`);
 
   return (
     <div className="page">

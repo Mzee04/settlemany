@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { decodePayload, encodePayload, explorerTxUrl } from "../chain/envelope.ts";
 import { formatBch } from "../domain/money.ts";
 import { CopyButton, downloadReceiptFiles } from "./bits.tsx";
+import { pageUrl } from "./url.ts";
 import type { NetworkId } from "../chain/address.ts";
 
 type Receipt = {
@@ -35,7 +36,7 @@ export function ReceiptScreen({ payload }: { payload: string }) {
       </div>
     );
   }
-  const link = `${location.origin}${location.pathname}#/receipt/${encodePayload(receipt)}`;
+  const link = pageUrl(`#/receipt/${encodePayload(receipt)}`);
   const lines = [
     receipt.title,
     receipt.memo,

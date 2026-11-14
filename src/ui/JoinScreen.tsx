@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { addressNetwork } from "../chain/address.ts";
 import { decodePayload, encodePayload } from "../chain/envelope.ts";
 import { useStore } from "../state/store.tsx";
+import { pageUrl } from "./url.ts";
 
 type Invite = {
   v: 1;
@@ -70,7 +71,7 @@ export function JoinScreen({ payload, returning }: { payload: string; returning:
           try {
             addressNetwork(address.trim());
             const next = encodePayload({ ...invite, kind: "return", address: address.trim() });
-            setLink(`${location.origin}${location.pathname}#/return/${next}`);
+            setLink(pageUrl(`#/return/${next}`));
             setError(null);
           } catch (caught) {
             setError(caught instanceof Error ? caught.message : "That address is not valid.");

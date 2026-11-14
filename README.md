@@ -12,7 +12,7 @@ npm test
 npm run dev
 ```
 
-The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Chipnet is the default network so a mis-click does not spend mainnet coins.
+The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Chipnet is the default network so a mis-click does not spend mainnet coins. The Chipnet / Mainnet toggle is in the top bar on every screen. Chipnet addresses use the `bchtest:` prefix and coins are read and broadcast through chipnet Fulcrum (`wss://chipnet.bch.ninja:50004`, then `wss://chipnet.imaginary.cash:50004`). Mainnet uses `bitcoincash:` and mainnet Electrum. WizardConnect follows the same toggle: the connected wallet’s receive key is shown as a `bchtest:` address on chipnet and a `bitcoincash:` address on mainnet. Put Paytaca in chipnet mode before you scan the QR for a test, and in mainnet mode before a real payment.
 
 ```bash
 npm run lint
@@ -20,13 +20,13 @@ npm run build
 npm run preview
 ```
 
-The production build is a static site (`dist/`) with relative asset paths, so it can be published on GitHub Pages. A workflow in `.github/workflows/pages.yml` runs the tests and deploys `dist/` when GitHub Pages is enabled for the repository (Settings → Pages → GitHub Actions).
+The public repo is [github.com/Mzee04/settlemany](https://github.com/Mzee04/settlemany). The production build is a static site (`dist/`) whose asset and route URLs use the `/settlemany/` base, so it loads at [mzee04.github.io/settlemany](https://mzee04.github.io/settlemany/). `.github/workflows/pages.yml` runs the tests and deploys `dist/` with `actions/upload-pages-artifact` and `actions/deploy-pages`. In the repository, set Settings → Pages → Build and deployment → Source to **GitHub Actions** (`build_type: workflow`). Hash routes (`#/pay`, `#/sign/…`) stay on that path, including links you copy for WizardConnect co-signing.
 
 There is no server and no database. The ledger stays in `localStorage`. Signing links and receipt links carry the transaction in the URL.
 
 ## Prize address
 
-The banner at the top of every screen shows three slots: the Widget Factory slides, the public repo (`PUBLIC_REPO_URL`, empty until you publish), and the CashTokens prize address.
+The banner at the top of every screen shows three slots: the Widget Factory slides, the public repo ([github.com/Mzee04/settlemany](https://github.com/Mzee04/settlemany)), and the CashTokens prize address.
 
 `PRIZE_ADDRESS` is the token-aware form of the Paytaca address `bitcoincash:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rs2gwlru4z`, derived with libauth (`tokenSupport: true`):
 

@@ -7,6 +7,7 @@ import { memberName, openTransfers, rawBalances, type Expense, type Group, type 
 import { formatUsd } from "../domain/money.ts";
 import { splitExpense, type SplitMode, type SplitPart } from "../domain/split.ts";
 import { uid, useStore } from "../state/store.tsx";
+import { pageUrl } from "./url.ts";
 
 export function GroupScreen({ group, editing }: { group: Group; editing: boolean }) {
   const store = useStore();
@@ -162,7 +163,7 @@ function Members({
                   memberId: member.id,
                   memberName: member.name,
                 });
-                void navigator.clipboard.writeText(`${location.origin}${location.pathname}#/join/${payload}`);
+                void navigator.clipboard.writeText(pageUrl(`#/join/${payload}`));
               }}
             >
               Copy invite link
