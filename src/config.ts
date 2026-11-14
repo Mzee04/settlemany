@@ -22,8 +22,23 @@ export const WIDGET_FACTORY_SLIDES_URL =
 /** Public repository. The banner links here. */
 export const PUBLIC_REPO_URL = "https://github.com/Mzee04/settlemany";
 
+/** Last commit before the BCH BLAZE kickoff (14 Nov 2026 14:00 UTC), tag `blaze-kickoff-before`. */
+export const CODE_BEFORE_URL = "https://github.com/Mzee04/settlemany/tree/blaze-kickoff-before";
+
+/** Code after kickoff. This is the repository BLAZE work lands on. */
+export const CODE_AFTER_URL = "https://github.com/Mzee04/settlemany";
+
 /** GitHub Pages site. Hash routes hang off this path. */
 export const PAGES_URL = "https://mzee04.github.io/settlemany/";
+
+/** Pre-kickoff demo. */
+export const DEMO_BEFORE_URL = "https://settlemany-before.onrender.com";
+
+/** Demo after kickoff. Mainnet is the default on this site. */
+export const DEMO_AFTER_URL = "https://mzee04.github.io/settlemany/";
+
+/** XO debug tool named in the BLAZE Migrate to XO bounty. */
+export const XO_DEBUG_TOOL_URL = "https://blaze.xo.cash/";
 
 /**
  * ParyonUSD fungible category on Bitcoin Cash mainnet. 2 decimal places.

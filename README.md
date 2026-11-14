@@ -12,7 +12,63 @@ npm test
 npm run dev
 ```
 
-The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Mainnet is the default network so a judge can send a small real Bitcoin Cash payment. Chipnet stays available as Chipnet test in the top bar, or by opening the page with `?network=chipnet`. Mainnet coins are read and broadcast through Fulcrum at `wss://cashnode.bch.ninja:443`, `wss://electrum.imaginary.cash:50004`, and `wss://bch.imaginary.cash:50004`. Mainnet transactions and addresses open on the Bitcoin Unlimited explorer (`https://explorer.bitcoinunlimited.info`). Chipnet uses Fulcrum at `wss://chipnet.bch.ninja:50004` and `wss://chipnet.imaginary.cash:50004`. A mainnet page refuses a `bchtest:` address, and a chipnet page refuses a `bitcoincash:` address. WizardConnect follows the toggle: the connected wallet’s receive key is shown as a `bitcoincash:` address on mainnet and a `bchtest:` address on chipnet. PUSD is mainnet-only, category `2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544`, the canonical mainnet-v1 id published at [paryonusd.com contract verification](https://paryonusd.com/docs/technical/contract-verification).
+The dev server listens on [http://127.0.0.1:4178](http://127.0.0.1:4178). Mainnet is the default network so a judge can send a small real Bitcoin Cash payment. Chipnet stays available as Chipnet test in the top bar, or by opening the page with `?network=chipnet`. On a group settle, the builder toggle defaults to **XO**. **Classic** keeps the previous builder.
+
+## BLAZE timeline
+
+BCH BLAZE 2026 kickoff was 14 November 2026 at 14:00 UTC. Submissions close 22 November 2026 at 14:00 UTC.
+
+Pre-kickoff code is the tag `blaze-kickoff-before`, commit `d9b522e`, the last commit before that kickoff. Everything after that commit is BLAZE work, including the XO migration.
+
+- Code before: https://github.com/Mzee04/settlemany/tree/blaze-kickoff-before
+- Code after: https://github.com/Mzee04/settlemany
+- Demo before: https://settlemany-before.onrender.com
+- Demo after: https://mzee04.github.io/settlemany/
+
+The banner on every screen links to those four URLs. Demo after is the GitHub Pages site from `main`. It shows this XO path after the owner merges it.
+
+## Built with XO
+
+The group-settle transaction is now described by an XO template and encoded through XO. Package versions are `@xo-cash/engine` `0.1.1-next.18029697917` (the `next` release on npm on 14 Nov 2026), `@xo-cash/utils` `0.0.10`, `@xo-cash/types` `0.0.8`, and `@xo-cash/templates` `0.0.12`. The template is validated with `parseTemplate` from `@xo-cash/utils`, which is what `Engine.importTemplate` stores.
+
+What moved onto XO:
+
+- [`src/xo/settlemanyTemplate.ts`](src/xo/settlemanyTemplate.ts) is the settlement contract. Action `settleGroup` is one version-2 transaction: debtor inputs, exact creditor outputs, debtor change, and an optional memo. The debtor unlock script asks for `schnorr_signature.all_outputs_all_utxos` (sighash `0x61`). Debtor slots have no maximum, and the minimum is 0 because a Paytaca user is not an XO account.
+- [`src/xo/settleInvitation.ts`](src/xo/settleInvitation.ts) builds a signed XO invitation with `InvitationBuilder` and `@xo-cash/crypto`, then encodes the transaction with `mergeInvitationCommits` and `buildInvitationTransactionFromMergedCommit`. The encoded transaction matches the classic builder byte for byte, including a fungible CashToken settlement. Tests check that match, and that signing the two debtors in either order produces the same transaction and passes the Bitcoin Cash virtual machine.
+- The settle screen defaults to this path. The signing link carries the serialized invitation. A receipt from the browser that created the invitation can copy it for the [XO debug tool](https://blaze.xo.cash/).
+- Follow-up action `spendReceivedSettlement` sits on the template receive script `receivedSettlement`. It spends a payment the template itself locked. That is the follow-up this contract can express.
+
+What stays off XO, and why:
+
+- WizardConnect still signs. `Engine.signInvitation` signs only keys derived from the engine account, and it refuses an input the account does not track (`InputUnspentOutputUnavailableError`). Paytaca holds the keys. Settlemany never asks for a seed. A coordination phrase created in this browser signs invitation commits only. It is stored in `localStorage`, it is not a wallet seed, and it is not in the repository. Another phone that opens the signing link cannot append those commits. The transaction hex still collects Paytaca signatures. Broadcast from the browser that built the link if you want the invitation itself to contain the unlocking bytecode and the transaction hash.
+- Coin selection and the 1 sat/byte fee split stay in `buildSettlement`. XO’s `listSpendableUnspentOutputs` only lists coins the engine account watches, and `addChangeToInvitation` prices fees as a flat amount per input and output and would send change to an engine-derived key.
+- Broadcast stays on the Electrum servers Settlemany already uses. `executeAction({ broadcastTransaction: true })` needs a running engine connected to Electrum and an account that tracks the inputs.
+- The one-person **Pay $0.02** screen is unchanged. It was already a single-signer send.
+- **Classic** on the settle screen is the previous builder, same sighash, same WizardConnect request. Use it when an XO encode throws. The screen says so. The tests that already covered the classic transaction still run, and the XO tests require the two encodings to match, so Classic and XO agree on the bytes whenever XO can represent the settlement.
+
+How to run the XO path:
+
+```bash
+npm install
+npm test
+npm run dev
+```
+
+Open [http://127.0.0.1:4178](http://127.0.0.1:4178). Leave the network on mainnet and the builder on XO.
+
+How a judge can try a mainnet settle with Paytaca:
+
+1. Use a tiny amount. Mainnet spends real Bitcoin Cash.
+2. Create a group. Give each member the CashTokens form of their Paytaca address (`bitcoincash:`, token-aware `z` prefix is fine). Add one small shared expense.
+3. Open Settle. Confirm the builder says XO and the network says mainnet.
+4. Build a real signing link. Connect Paytaca with WizardConnect. Each debtor opens the link on the phone that holds their coins and taps Sign my inputs. Paytaca must leave broadcast off. Settlemany rejects any sighash other than `0x61`.
+5. When every debtor has signed, broadcast from the same browser that built the link, so that browser still has the coordination key and can write the signatures and the transaction hash onto the invitation.
+6. On the receipt, copy the XO invitation and paste it into https://blaze.xo.cash/ . The transaction id opens on the Bitcoin Unlimited explorer.
+7. Chipnet works the same way: choose Chipnet test, or open `?network=chipnet`, and use `bchtest:` addresses. Chipnet has no canonical PUSD. A `bchtest:` address is refused on mainnet, and a `bitcoincash:` address is refused on chipnet.
+
+The Migrate to XO bounty also asks for personally written development feedback of about 500 words. That note has to be written by the person who did the work. It is not in this repository.
+
+Mainnet coins are read and broadcast through Fulcrum at `wss://cashnode.bch.ninja:443`, `wss://electrum.imaginary.cash:50004`, and `wss://bch.imaginary.cash:50004`. Mainnet transactions and addresses open on the Bitcoin Unlimited explorer (`https://explorer.bitcoinunlimited.info`). Chipnet uses Fulcrum at `wss://chipnet.bch.ninja:50004` and `wss://chipnet.imaginary.cash:50004`. A mainnet page refuses a `bchtest:` address, and a chipnet page refuses a `bitcoincash:` address. WizardConnect follows the toggle: the connected wallet’s receive key is shown as a `bitcoincash:` address on mainnet and a `bchtest:` address on chipnet. PUSD is mainnet-only, category `2469acc5afa4b10cb5b5c04afb89c3a3ffd61c5da9c01e26d00951cae2a02544`, the canonical mainnet-v1 id published at [paryonusd.com contract verification](https://paryonusd.com/docs/technical/contract-verification).
 
 ```bash
 npm run lint
@@ -26,7 +82,7 @@ There is no server and no database. The ledger stays in `localStorage`. Signing 
 
 ## Prize address
 
-The banner at the top of every screen is a slim BCH BLAZE 2026 entry: Slides, Code, Vote with EMBER2026 and the CashTokens address, a copy button, and a line that it was built from 14 Nov 2026.
+The banner at the top of every screen is a slim BCH BLAZE 2026 entry: Slides, Code before, Code after, Demo before, Demo after, Vote with EMBER2026 and the CashTokens address, a copy button, and a line that Settlemany was started on 14 Nov 2026, before the kickoff.
 
 `PRIZE_ADDRESS` is the token-aware form of the Paytaca address `bitcoincash:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rs2gwlru4z`, derived with libauth (`tokenSupport: true`):
 
@@ -36,7 +92,7 @@ bitcoincash:zp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsdzapd623
 
 The banner shows that z address beside Vote with EMBER2026. The q address locks the same P2PKH script.
 
-The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a slim high-contrast ticket: factory hazard stripe, Slides, Code, the prize address, and built from 14 Nov 2026.
+The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a slim high-contrast ticket: factory hazard stripe, the four before/after links, the prize address, and the line that work started on 14 Nov 2026 before kickoff.
 
 ## Live proof
 
@@ -54,7 +110,7 @@ An earlier single-wallet send of $0.02 on the same network is [8068648f657eff370
 
 1. **Send $0.02 on mainnet.** Connect Paytaca on mainnet. The form shows the balance of the connected address and a button to copy that address. A `bchtest:` address is rejected, and the send button stays off. After the wallet signs, the receipt says so and the full transaction id is the explorer link.
 2. **Open the demo group.** “Eko Atlantic weekend” is chipnet. It is already filled in: an apartment split equally, dinner by shares, a boat split equally, and suya by percent. The net is three payments to Adaeze, in integer cents. Those addresses start with `bchtest:`.
-3. **Simulate the one transaction.** Public demo keys sign a transaction with pretend coins. libauth’s virtual machine checks it. The receipt shows the txid, the amounts, the fee, and an explorer link, and it is marked **not broadcast**. Download CSV and PDF, or copy the receipt link.
+3. **Simulate the one transaction.** Leave the builder on XO, or switch it to Classic. Public demo keys sign a transaction with pretend coins. libauth’s virtual machine checks it. The receipt shows the txid, the amounts, the fee, and an explorer link, and it is marked **not broadcast**. An XO simulation also carries the invitation. Download CSV and PDF, or copy the receipt link.
 
 ## Privacy
 
@@ -107,19 +163,17 @@ Paytaca’s public release notes say it signs P2PKH with `SIGHASH_UTXOS`, honors
 
 ## XO template
 
-[`src/xo/settlemanyTemplate.ts`](src/xo/settlemanyTemplate.ts) is a settlement template in the shape published by `@xo-cash/templates` (the current [XO stack](https://stack.xo.cash/) format). It adds **Settle in Bitcoin Cash** and **Settle in a CashToken**, and the P2PKH unlock asks for `schnorr_signature.all_outputs_all_utxos`, the same `0x61` commitment as the app.
-
-`importWalletTemplate` from libauth rejects this file, and it also rejects the upstream `p2pkhTemplate`, because those templates no longer match libauth’s older wallet-template schema (it asks for `entities` and then rejects additional properties). The test checks that Settlemany’s template has the same top-level shape as the official P2PKH template and that the sighash identifier is present.
+The contract lives in [`src/xo/settlemanyTemplate.ts`](src/xo/settlemanyTemplate.ts). `parseTemplate` from `@xo-cash/utils` accepts it. libauth’s older `importWalletTemplate` is not the XO validator: it still asks for `entities` and then rejects properties the current XO templates use, including the upstream `p2pkhTemplate`. See [Built with XO](#built-with-xo) for what the app encodes through XO and what Paytaca still signs.
 
 ## Layout
 
 - `src/domain` — integer cents, splits, netting, the demo group
 - `src/chain` — addresses, the settlement builder, signing, Electrum, signing packets
 - `src/ui` — the banner, the ledger, the signing room, the small mainnet payment, receipts
-- `src/xo` — the XO template
+- `src/xo` — the XO template, the invitation encoder, and the coordination phrase kept in this browser
 
 WizardConnect is LGPL-3.0. This application is MIT and links to it; changes to WizardConnect itself would stay under the LGPL.
 
 ## Tests
 
-`npm test` covers netting, splits, FX and satoshi conversion, the demo group, BCH and CashToken settlement, partial signatures, sighash rejection, stale-UTXO rebuild, the demo click-through, the XO template shape, and a live chipnet Electrum version check. The Electrum test needs a network path to `chipnet.bch.ninja`.
+`npm test` covers netting, splits, FX and satoshi conversion, the demo group, BCH and CashToken settlement, partial signatures, sighash rejection, stale-UTXO rebuild, the demo click-through, the XO template, an XO invitation that encodes the same transaction as the classic builder on chipnet and mainnet, a fungible-token invitation, and a live chipnet Electrum version check. The Electrum test needs a network path to `chipnet.bch.ninja`. The XO tests do not broadcast.

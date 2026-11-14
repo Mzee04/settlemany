@@ -1,0 +1,181 @@
+import { sha256 } from "@bitauth/libauth";
+import { describe, expect, it } from "vitest";
+import { demoIdentity } from "../chain/address.ts";
+import { buildSettlement, type SpendableCoin } from "../chain/settle.ts";
+import { signOwners, transactionId, verifySettlement } from "../chain/sign.ts";
+import {
+  applyWalletUnlocks,
+  compileSettlementInvitation,
+  invitationTransaction,
+  recordInvitationResult,
+} from "./settleInvitation.ts";
+import { SETTLEMANY_TEMPLATE_IDENTIFIER } from "./settlemanyTemplate.ts";
+
+/** Public BIP39 test vector. It only signs invitation commits in these tests. */
+const COORDINATOR = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+const CATEGORY = "11".repeat(32);
+
+function coin(ownerId: string, label: string, satoshis: bigint, tokenAmount = 0n): SpendableCoin {
+  const identity = demoIdentity(ownerId);
+  return {
+    txid: txid(label),
+    vout: 0,
+    satoshis,
+    lockingBytecode: identity.lockingBytecode,
+    tokenAmount,
+    tokenCategoryHex: tokenAmount > 0n ? CATEGORY : null,
+    ownerId,
+  };
+}
+
+function txid(label: string): string {
+  return [...sha256.hash(new TextEncoder().encode(label))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+describe("XO group settlement", () => {
+  const ada = demoIdentity("ada");
+  const bob = demoIdentity("bob");
+  const chidi = demoIdentity("chidi");
+  const daya = demoIdentity("daya");
+  const addresses = {
+    ada: ada.address,
+    bob: bob.address,
+    chidi: chidi.address,
+    daya: daya.address,
+  };
+  const transfers = [
+    { fromId: "ada", toId: "chidi", amount: 60_000n },
+    { fromId: "ada", toId: "daya", amount: 40_000n },
+    { fromId: "bob", toId: "chidi", amount: 50_000n },
+    { fromId: "bob", toId: "daya", amount: 25_000n },
+  ];
+  const coins = [coin("ada", "ada-utxo", 200_000n), coin("bob", "bob-utxo", 150_000n)];
+  const keys = { ada: ada.privateKey, bob: bob.privateKey };
+
+  function built(network: "chipnet" | "mainnet" = "chipnet") {
+    return buildSettlement({
+      network,
+      asset: "bch",
+      transfers,
+      addresses,
+      coins,
+      memo: "Eko weekend",
+    });
+  }
+
+  it("encodes the same transaction as the classic builder and keeps a valid invitation", () => {
+    const settlement = built();
+    const compiled = compileSettlementInvitation({
+      built: settlement,
+      network: "chipnet",
+      memo: "Eko weekend",
+      coordinationMnemonic: COORDINATOR,
+    });
+    expect(compiled.templateIdentifier).toBe(SETTLEMANY_TEMPLATE_IDENTIFIER);
+    expect(invitationTransaction(compiled.invitation)).toEqual(settlement.transaction);
+    const signed = signOwners({
+      transaction: settlement.transaction,
+      sourceOutputs: settlement.sourceOutputs,
+      inputOwners: settlement.inputOwners,
+      keys,
+    });
+    expect(verifySettlement(signed, settlement.sourceOutputs)).toBe(true);
+    const adaFirst = signOwners({
+      transaction: signOwners({
+        transaction: settlement.transaction,
+        sourceOutputs: settlement.sourceOutputs,
+        inputOwners: settlement.inputOwners,
+        keys,
+        onlyOwnerId: "ada",
+      }),
+      sourceOutputs: settlement.sourceOutputs,
+      inputOwners: settlement.inputOwners,
+      keys,
+      onlyOwnerId: "bob",
+    });
+    const bobFirst = signOwners({
+      transaction: signOwners({
+        transaction: settlement.transaction,
+        sourceOutputs: settlement.sourceOutputs,
+        inputOwners: settlement.inputOwners,
+        keys,
+        onlyOwnerId: "bob",
+      }),
+      sourceOutputs: settlement.sourceOutputs,
+      inputOwners: settlement.inputOwners,
+      keys,
+      onlyOwnerId: "ada",
+    });
+    expect(transactionId(adaFirst)).toBe(transactionId(bobFirst));
+    expect(verifySettlement(adaFirst, settlement.sourceOutputs)).toBe(true);
+    expect(verifySettlement(bobFirst, settlement.sourceOutputs)).toBe(true);
+    const withUnlocks = applyWalletUnlocks({
+      invitation: compiled.invitation,
+      transaction: signed,
+      network: "chipnet",
+      coordinationMnemonic: COORDINATOR,
+    });
+    expect(withUnlocks).not.toBe(compiled.invitation);
+    const recorded = recordInvitationResult({
+      invitation: withUnlocks,
+      network: "chipnet",
+      coordinationMnemonic: COORDINATOR,
+      broadcasted: true,
+    });
+    expect(recorded).toContain("groupSettlementTransaction");
+    const ignored = applyWalletUnlocks({
+      invitation: compiled.invitation,
+      transaction: signed,
+      network: "chipnet",
+      coordinationMnemonic:
+        "legal winner thank year wave sausage worth useful legal winner thank yellow",
+    });
+    expect(ignored).toBe(compiled.invitation);
+  });
+
+  it("uses a mainnet entity identifier on mainnet", () => {
+    const settlement = buildSettlement({
+      network: "mainnet",
+      asset: "bch",
+      transfers,
+      addresses: {
+        ada: demoIdentity("ada", "mainnet").address,
+        bob: demoIdentity("bob", "mainnet").address,
+        chidi: demoIdentity("chidi", "mainnet").address,
+        daya: demoIdentity("daya", "mainnet").address,
+      },
+      coins: [
+        { ...coin("ada", "ada-main", 200_000n), lockingBytecode: demoIdentity("ada", "mainnet").lockingBytecode },
+        { ...coin("bob", "bob-main", 150_000n), lockingBytecode: demoIdentity("bob", "mainnet").lockingBytecode },
+      ],
+      memo: "mainnet",
+    });
+    const compiled = compileSettlementInvitation({
+      built: settlement,
+      network: "mainnet",
+      memo: "mainnet",
+      coordinationMnemonic: COORDINATOR,
+    });
+    expect(compiled.invitation).toContain("xpub");
+    expect(compiled.invitation).not.toContain("tpub");
+  });
+
+  it("covers a fungible token settlement", () => {
+    const settlement = buildSettlement({
+      network: "chipnet",
+      asset: "pusd",
+      tokenCategoryHex: CATEGORY,
+      transfers: [{ fromId: "ada", toId: "chidi", amount: 250n }],
+      addresses,
+      coins: [coin("ada", "ada-token", 20_000n, 400n), coin("ada", "ada-fee", 20_000n)],
+      memo: "token",
+    });
+    const compiled = compileSettlementInvitation({
+      built: settlement,
+      network: "chipnet",
+      memo: "token",
+      coordinationMnemonic: COORDINATOR,
+    });
+    expect(invitationTransaction(compiled.invitation).outputs.some((output) => output.token?.amount === 250n)).toBe(true);
+  });
+});
