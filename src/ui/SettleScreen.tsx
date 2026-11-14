@@ -9,6 +9,7 @@ import { buildSettlement, SettleError, type SpendableCoin } from "../chain/settl
 import { signOwners, transactionId, verifySettlement } from "../chain/sign.ts";
 import { memberName, openTransfers, type Group } from "../domain/ledger.ts";
 import { formatBch, formatToken, formatUsd } from "../domain/money.ts";
+import { receiptPayments } from "../domain/receipt.ts";
 import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
 import { pageUrl } from "./url.ts";
@@ -116,7 +117,24 @@ export function SettleScreen({ group }: { group: Group }) {
         broadcast: false,
         demo: true,
         feeSats: made.feeSats,
-        lines: receiptLines(made, txid),
+        createdAt: new Date().toISOString(),
+        payments: receiptPayments({
+          date: new Date().toISOString(),
+          group: group.name,
+          network,
+          asset,
+          feeSats: made.feeSats,
+          txid,
+          legs: made.legs.map((leg) => ({
+            fromName: leg.fromName,
+            toName: leg.toName,
+            fromAddress: made.addresses[leg.fromId] ?? "",
+            toAddress: made.addresses[leg.toId] ?? "",
+            usdCents: leg.usdCents,
+            amount: leg.amount,
+          })),
+        }),
+        lines: made.legs.map((leg) => `${leg.fromName} pays ${leg.toName} ${formatUsd(leg.usdCents)}`),
         note:
           asset === "pusd"
             ? "Simulated test CashToken. This is not mainnet PUSD, and it was not broadcast."
@@ -299,11 +317,3 @@ export function SettleScreen({ group }: { group: Group }) {
   );
 }
 
-function receiptLines(packet: SigningPacket, txid: string): string[] {
-  return [
-    packet.groupName,
-    ...packet.legs.map((leg) => `${leg.fromName} pays ${leg.toName} ${formatUsd(leg.usdCents)}`),
-    `Fee ${packet.feeSats} sats`,
-    `txid ${txid}`,
-  ];
-}

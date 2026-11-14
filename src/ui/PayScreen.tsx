@@ -2,11 +2,12 @@ import { useState } from "react";
 import { PUSD_CATEGORY_MAINNET } from "../config.ts";
 import { addressNetwork, lockingBytecodeForAddress } from "../chain/address.ts";
 import { broadcast, coinsForAddress, withElectrum } from "../chain/electrum.ts";
-import { encodePayload, explorerTxUrl } from "../chain/envelope.ts";
+import { encodePayload } from "../chain/envelope.ts";
 import { buildSettlement } from "../chain/settle.ts";
 import { transactionHex } from "../chain/settle.ts";
 import { signWithWallet } from "../chain/wallet.ts";
 import { formatBch, formatUsd, usdCentsToSats } from "../domain/money.ts";
+import { receiptPayments } from "../domain/receipt.ts";
 import { useStore } from "../state/store.tsx";
 import { useWallet } from "./wallet.tsx";
 
@@ -70,12 +71,26 @@ export function PayScreen() {
         broadcast: true,
         demo: false,
         feeSats: built.feeSats.toString(),
-        lines: [
-          `${formatUsd(cents)} to ${target}`,
-          asset === "bch" ? formatBch(amount) : `${cents} PUSD units`,
-          `Fee ${built.feeSats.toString()} sats`,
-          explorerTxUrl(store.network, txid),
-        ],
+        createdAt: new Date().toISOString(),
+        payments: receiptPayments({
+          date: new Date().toISOString(),
+          group: "Settlemany payment",
+          network: store.network,
+          asset,
+          feeSats: built.feeSats.toString(),
+          txid,
+          legs: [
+            {
+              fromName: "Payer",
+              toName: target === wallet.address ? "Yourself" : "Recipient",
+              fromAddress: wallet.address ?? "",
+              toAddress: target,
+              usdCents: cents,
+              amount: amount.toString(),
+            },
+          ],
+        }),
+        lines: [`${formatUsd(cents)} to ${target}`, asset === "bch" ? formatBch(amount) : `${cents} PUSD units`],
         note: target === wallet.address ? "You paid yourself, so only the fee left the wallet." : "Sent to the address you pasted.",
       })}`;
     } catch (error) {

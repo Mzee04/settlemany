@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { decodePayload, encodePayload, explorerTxUrl } from "../chain/envelope.ts";
-import { formatBch } from "../domain/money.ts";
+import { receiptPayments, type ReceiptPayment } from "../domain/receipt.ts";
 import { CopyButton, downloadReceiptFiles } from "./bits.tsx";
 import { pageUrl } from "./url.ts";
 import type { NetworkId } from "../chain/address.ts";
@@ -16,6 +16,8 @@ type Receipt = {
   demo: boolean;
   feeSats: string;
   lines: string[];
+  payments?: ReceiptPayment[];
+  createdAt?: string;
   note?: string;
 };
 
@@ -37,19 +39,26 @@ export function ReceiptScreen({ payload }: { payload: string }) {
     );
   }
   const link = pageUrl(`#/receipt/${encodePayload(receipt)}`);
-  const lines = [
-    receipt.title,
-    receipt.memo,
-    receipt.note ?? "",
-    receipt.verified,
-    receipt.broadcast ? "Broadcast" : "Not broadcast",
-    receipt.demo ? "Demo keys" : "Wallet signatures",
-    `Network ${receipt.network}`,
-    `Asset ${receipt.asset}`,
-    `Fee ${formatBch(BigInt(receipt.feeSats || "0"))}`,
-    receipt.txid ? `txid ${receipt.txid}` : "no txid",
-    ...receipt.lines,
-  ].filter(Boolean);
+  const payments = receipt.payments?.length
+    ? receipt.payments
+    : receiptPayments({
+        date: receipt.createdAt ?? "",
+        group: receipt.memo || receipt.title,
+        network: receipt.network,
+        asset: receipt.asset,
+        feeSats: receipt.feeSats || "0",
+        txid: receipt.txid ?? "",
+        legs: [
+          {
+            fromName: "",
+            toName: "",
+            fromAddress: "",
+            toAddress: "",
+            usdCents: 0,
+            amount: "",
+          },
+        ],
+      });
 
   return (
     <div className="page">
@@ -78,7 +87,7 @@ export function ReceiptScreen({ payload }: { payload: string }) {
         )}
         <div className="row">
           <CopyButton value={link} label="Copy receipt link" />
-          <button className="btn ghost" type="button" onClick={() => downloadReceiptFiles(receipt.title, lines)}>
+          <button className="btn ghost" type="button" onClick={() => downloadReceiptFiles(payments)}>
             Download CSV and PDF
           </button>
         </div>

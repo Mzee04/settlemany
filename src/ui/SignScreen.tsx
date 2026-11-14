@@ -7,6 +7,7 @@ import { buildSettlement, type SpendableCoin } from "../chain/settle.ts";
 import { signedIndexes, verifySettlement } from "../chain/sign.ts";
 import { staleInputIndexes } from "../chain/stale.ts";
 import { formatUsd } from "../domain/money.ts";
+import { receiptPayments } from "../domain/receipt.ts";
 import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
 import { pageUrl } from "./url.ts";
@@ -158,6 +159,23 @@ export function SignScreen({ payload }: { payload: string }) {
         broadcast: true,
         demo: false,
         feeSats: live.feeSats,
+        createdAt: new Date().toISOString(),
+        payments: receiptPayments({
+          date: new Date().toISOString(),
+          group: live.groupName,
+          network: live.network,
+          asset: live.asset,
+          feeSats: live.feeSats,
+          txid,
+          legs: live.legs.map((leg) => ({
+            fromName: leg.fromName,
+            toName: leg.toName,
+            fromAddress: live.addresses[leg.fromId] ?? "",
+            toAddress: live.addresses[leg.toId] ?? "",
+            usdCents: leg.usdCents,
+            amount: leg.amount,
+          })),
+        }),
         lines: live.legs.map((leg) => `${leg.fromName} paid ${leg.toName} ${formatUsd(leg.usdCents)}`),
         note: "Broadcast to the network.",
       })}`;

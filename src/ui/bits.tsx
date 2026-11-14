@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { downloadBytes, downloadText, receiptPdf, toCsv } from "../domain/export.ts";
+import { downloadBytes, downloadText } from "../domain/export.ts";
+import { receiptCsv, receiptTablePdf, type ReceiptPayment } from "../domain/receipt.ts";
 
 export function QrCode({ value }: { value: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -34,11 +35,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
-export function downloadReceiptFiles(title: string, lines: string[]): void {
-  downloadText(
-    "settlemany-receipt.csv",
-    toCsv([["line"], ...lines.map((line) => [line])]),
-    "text/csv",
-  );
-  downloadBytes("settlemany-receipt.pdf", receiptPdf([title, ...lines]), "application/pdf");
+export function downloadReceiptFiles(payments: ReceiptPayment[]): void {
+  downloadText("settlemany-receipt.csv", receiptCsv(payments), "text/csv");
+  downloadBytes("settlemany-receipt.pdf", receiptTablePdf(payments), "application/pdf");
 }

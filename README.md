@@ -38,6 +38,18 @@ The banner shows that z address as the CashTokens prize address and the original
 
 The Google Slides file linked from the hackathon brief exported as the Widget Factory example deck (the project story), not a separate banner specification. The header is a high-contrast ticket: factory hazard stripe, project name, the prize address, and BCH BLAZE 2026.
 
+## Live proof
+
+Two Paytaca wallets on chipnet each signed only their own input, and one transaction paid the receiver exactly.
+
+- Group settle: [10976994b4ffab36a9f6eb8d25459ca3451e5d65302e867e1076dbd46a0f5927](https://explorer.selene.cash/tx/10976994b4ffab36a9f6eb8d25459ca3451e5d65302e867e1076dbd46a0f5927?network=chipnet)
+- Payers: `bchtest:zpjfemuqvwy4kfay7p6j6kkqls4rxxkv7uvdw9ghdg` (me) and `bchtest:zzh0srv55mem9nd8508llyuchm6e5vea9ylmynsfxy` (friend)
+- Receiver: `bchtest:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsw62cptj7` got **9,060 sats** ($0.02). Miner fee **437 sats**.
+
+That transaction is the one-transaction claim on a public chain. Two real Paytaca iOS wallets, connected with WizardConnect, each signed only the input they owned. The sighash was `SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_UTXOS`, so each signature commits to every input and every output. The receiver was paid that exact amount. Nobody broadcast a second transaction to finish the split.
+
+An earlier single-wallet send of $0.02 on the same network is [8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47](https://explorer.selene.cash/tx/8068648f657eff370e8d1c3c8da21b046f11c3a7be95426461f8b75438c00e47?network=chipnet). A mainnet test is still to come.
+
 ## What a judge can click
 
 1. **Open the demo group.** “Eko Atlantic weekend” is already filled in: an apartment split equally, dinner by shares, a boat split equally, and suya by percent. The net is three payments to Adaeze, in integer cents.
