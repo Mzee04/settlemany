@@ -21,6 +21,7 @@ import {
   SETTLE_GROUP_ACTION,
   SETTLEMANY_TEMPLATE_IDENTIFIER,
   settlemanyTemplate,
+  withCanonicalBigIntJson,
 } from "./settlemanyTemplate.ts";
 
 export class XoPathError extends Error {
@@ -46,6 +47,15 @@ export function xoNetwork(network: NetworkId): XONetwork {
  * byte. Wallet signatures are attached later with `applyWalletUnlocks`.
  */
 export function compileSettlementInvitation(args: {
+  built: BuiltSettlement;
+  network: NetworkId;
+  memo: string;
+  coordinationMnemonic: string;
+}): { invitation: string; templateIdentifier: string } {
+  return withCanonicalBigIntJson(() => compileSettlementInvitationNow(args));
+}
+
+function compileSettlementInvitationNow(args: {
   built: BuiltSettlement;
   network: NetworkId;
   memo: string;
@@ -118,6 +128,15 @@ export function applyWalletUnlocks(args: {
   network: NetworkId;
   coordinationMnemonic: string;
 }): string {
+  return withCanonicalBigIntJson(() => applyWalletUnlocksNow(args));
+}
+
+function applyWalletUnlocksNow(args: {
+  invitation: string;
+  transaction: TransactionCommon;
+  network: NetworkId;
+  coordinationMnemonic: string;
+}): string {
   const network = xoNetwork(args.network);
   const current = readInvitation(args.invitation);
   const crypto = openCrypto(args.coordinationMnemonic, network);
@@ -150,6 +169,15 @@ export function applyWalletUnlocks(args: {
 
 /** Record the built transaction hash, and the broadcast, on the invitation. */
 export function recordInvitationResult(args: {
+  invitation: string;
+  network: NetworkId;
+  coordinationMnemonic: string;
+  broadcasted: boolean;
+}): string {
+  return withCanonicalBigIntJson(() => recordInvitationResultNow(args));
+}
+
+function recordInvitationResultNow(args: {
   invitation: string;
   network: NetworkId;
   coordinationMnemonic: string;
@@ -202,9 +230,11 @@ export function recordInvitationResult(args: {
 }
 
 export function invitationTransaction(invitation: string): TransactionCommon {
-  const decoded = decodeTransaction(hexToBin(encodeInvitationTransaction(readInvitation(invitation))));
-  if (typeof decoded === "string") throw new XoPathError("xo-decode", decoded);
-  return decoded;
+  return withCanonicalBigIntJson(() => {
+    const decoded = decodeTransaction(hexToBin(encodeInvitationTransaction(readInvitation(invitation))));
+    if (typeof decoded === "string") throw new XoPathError("xo-decode", decoded);
+    return decoded;
+  });
 }
 
 /**

@@ -11,7 +11,8 @@ import {
   invitationTransaction,
   recordInvitationResult,
 } from "./settleInvitation.ts";
-import { SETTLEMANY_TEMPLATE_IDENTIFIER } from "./settlemanyTemplate.ts";
+import { generateTemplateIdentifier } from "@xo-cash/utils";
+import { SETTLEMANY_TEMPLATE_IDENTIFIER, settlemanyTemplate } from "./settlemanyTemplate.ts";
 
 /** Public BIP39 test vector. It only signs invitation commits in these tests. */
 const COORDINATOR = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -260,6 +261,72 @@ describe("XO group settlement", () => {
     }
   });
 });
+
+it("builds a mainnet one-debtor signing link while BigInt JSON is patched", () => {
+    const proto = BigInt.prototype as unknown as { toJSON?: () => string };
+    const previous = proto.toJSON;
+    proto.toJSON = function decimalBigInt(this: bigint) {
+      return this.toString();
+    };
+    try {
+      const hostileHash = generateTemplateIdentifier(settlemanyTemplate);
+      expect(hostileHash).toBe("9416937b911cc1915c2a632ff16c650958f56f14590a2898869680bff7f8d282");
+      expect(SETTLEMANY_TEMPLATE_IDENTIFIER).toBe("56e21b56140e309a9b3276dd42f5054ff984b3c95351c64af36f5f07fc585a99");
+      expect(hostileHash).not.toBe(SETTLEMANY_TEMPLATE_IDENTIFIER);
+      const me = demoIdentity("me", "mainnet");
+      const goodness = demoIdentity("goodness", "mainnet");
+      const settlement = buildSettlement({
+        network: "mainnet",
+        asset: "bch",
+        transfers: [{ fromId: "me", toId: "goodness", amount: 5016n }],
+        addresses: { me: me.address, goodness: goodness.address },
+        coins: [{
+          txid: txid("happiness"),
+          vout: 0,
+          satoshis: 20_000n,
+          lockingBytecode: me.lockingBytecode,
+          tokenAmount: 0n,
+          tokenCategoryHex: null,
+          ownerId: "me",
+        }],
+        memo: "happiness",
+      });
+      const compiled = compileSettlementInvitation({
+        built: settlement,
+        network: "mainnet",
+        memo: "happiness",
+        coordinationMnemonic: COORDINATOR,
+      });
+      expect(compiled.templateIdentifier).toBe(SETTLEMANY_TEMPLATE_IDENTIFIER);
+      expect(compiled.invitation).toContain(SETTLEMANY_TEMPLATE_IDENTIFIER);
+      const packet = linkPacket(settlement, "mainnet", compiled.invitation);
+      const opened = decodePayload<SigningPacket>(encodePayload(packet));
+      const signed = signOwners({
+        transaction: settlement.transaction,
+        sourceOutputs: settlement.sourceOutputs,
+        inputOwners: settlement.inputOwners,
+        keys: { me: me.privateKey },
+      });
+      const withUnlocks = applyWalletUnlocks({
+        invitation: opened.xoInvitation ?? "",
+        transaction: signed,
+        network: "mainnet",
+        coordinationMnemonic: COORDINATOR,
+      });
+      const recorded = recordInvitationResult({
+        invitation: withUnlocks,
+        network: "mainnet",
+        coordinationMnemonic: COORDINATOR,
+        broadcasted: false,
+      });
+      expect(invitationTransaction(recorded).outputs[0]?.valueSatoshis).toBe(5016n);
+      expect(Object.isFrozen(settlemanyTemplate)).toBe(true);
+      expect(typeof settlemanyTemplate.outputs.settlementMemo?.valueSatoshis).toBe("bigint");
+    } finally {
+      if (previous === undefined) delete proto.toJSON;
+      else proto.toJSON = previous;
+    }
+  });
 
 function linkPacket(settlement: BuiltSettlement, network: "mainnet" | "chipnet", invitation: string): SigningPacket {
   return settlementToPacket({
