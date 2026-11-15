@@ -1,4 +1,5 @@
 import {
+  binToHex,
   cashAddressToLockingBytecode,
   encodeLockingBytecodeP2pkh,
   hash160,
@@ -19,6 +20,25 @@ export function lockingBytecodeForAddress(address: string): Uint8Array {
   const decoded = cashAddressToLockingBytecode(address.trim());
   if (typeof decoded === "string") throw new Error(decoded);
   return decoded.bytecode;
+}
+
+/**
+ * Locking-bytecode hex for a cashaddr, or null when the text is not one.
+ * The network prefix and the token-aware type bit are not part of the result,
+ * so `q` and `z` forms of one key, and `bitcoincash` and `bchtest` forms of
+ * one script, share an identity.
+ */
+export function cashaddrIdentity(address: string): string | null {
+  const decoded = cashAddressToLockingBytecode(address.trim());
+  if (typeof decoded === "string") return null;
+  return binToHex(decoded.bytecode);
+}
+
+/** True when both cashaddrs encode the same locking script. */
+export function sameCashaddr(left: string, right: string): boolean {
+  const a = cashaddrIdentity(left);
+  const b = cashaddrIdentity(right);
+  return a !== null && a === b;
 }
 
 export function addressNetwork(address: string): NetworkId {

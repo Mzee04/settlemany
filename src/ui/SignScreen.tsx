@@ -12,7 +12,9 @@ import { useStore } from "../state/store.tsx";
 import { CopyButton, QrCode } from "./bits.tsx";
 import { pageUrl } from "./url.ts";
 import { useWallet } from "./wallet.tsx";
-import { lockingBytecodeForAddress } from "../chain/address.ts";
+import { assertAddressOnNetwork, lockingBytecodeForAddress } from "../chain/address.ts";
+import { ConnectedSignerStatus } from "./ConnectedSigner.tsx";
+import { unsignedDebtors } from "./signerMatch.ts";
 import { signWithWallet } from "../chain/wallet.ts";
 import { coordinatorMnemonic, existingCoordinatorMnemonic } from "../xo/coordinator.ts";
 import { applyWalletUnlocks, compileSettlementInvitation, recordInvitationResult } from "../xo/settleInvitation.ts";
@@ -218,14 +220,15 @@ export function SignScreen({ payload }: { payload: string }) {
     }
   }
 
-  async function rebuild() {
+  async function rebuild(options?: { addresses?: Record<string, string>; success?: string }) {
     setBusy(true);
     setMessage(null);
+    const addresses = options?.addresses ?? live.addresses;
     try {
       const coins = await withElectrum(live.network, async (client) => {
         const found: SpendableCoin[] = [];
         for (const ownerId of owners) {
-          const address = live.addresses[ownerId];
+          const address = addresses[ownerId];
           if (!address) continue;
           found.push(...(await coinsForAddress(client, address, ownerId)));
         }
@@ -236,7 +239,7 @@ export function SignScreen({ payload }: { payload: string }) {
         asset: live.asset,
         tokenCategoryHex: live.tokenCategoryHex ?? undefined,
         transfers: live.legs.map((leg) => ({ fromId: leg.fromId, toId: leg.toId, amount: BigInt(leg.amount) })),
-        addresses: live.addresses,
+        addresses,
         coins,
         memo: live.memo,
       });
@@ -262,14 +265,28 @@ export function SignScreen({ payload }: { payload: string }) {
         tokenCategoryHex: live.tokenCategoryHex,
         memo: live.memo,
         legs: live.legs,
-        addresses: live.addresses,
+        addresses,
         demo: false,
         builder: useXo && xoInvitation ? "xo" : "classic",
         xoInvitation,
       });
+      if (options?.addresses && live.groupId) {
+        const group = store.groups.find((item) => item.id === live.groupId);
+        if (group) {
+          const overrides = options.addresses;
+          store.saveGroup({
+            ...group,
+            members: group.members.map((member) =>
+              overrides[member.id] && overrides[member.id] !== member.address
+                ? { ...member, address: overrides[member.id] ?? member.address, demoKeyLabel: null }
+                : member,
+            ),
+          });
+        }
+      }
       setPacket(next);
       window.location.hash = `#/sign/${encodePayload(next)}`;
-      setMessage("Rebuilt without the spent coins. Earlier signatures no longer apply, so everyone signs again.");
+      setMessage(options?.success ?? "Rebuilt without the spent coins. Earlier signatures no longer apply, so everyone signs again.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not rebuild.");
     } finally {
@@ -277,7 +294,27 @@ export function SignScreen({ payload }: { payload: string }) {
     }
   }
 
+  async function applyConnectedAddress(ownerId: string) {
+    if (!wallet.address) {
+      setMessage("Connect the wallet first.");
+      return;
+    }
+    try {
+      assertAddressOnNetwork(wallet.address, live.network);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "That address is not on this settlement’s network.");
+      return;
+    }
+    const name = live.inputs.find((input) => input.ownerId === ownerId)?.ownerName ?? ownerId;
+    await rebuild({
+      addresses: { ...live.addresses, [ownerId]: wallet.address.trim() },
+      success: `Updated ${name} to the connected address and rebuilt the transaction. Earlier signatures no longer apply, so everyone signs again.`,
+    });
+  }
+
   const link = pageUrl(`#/sign/${encodePayload(live)}`);
+  const unsigned = unsignedDebtors(live.inputs, live.addresses, done);
+  const localGroup = live.groupId ? store.groups.find((item) => item.id === live.groupId) : undefined;
 
   return (
     <div className="page">
@@ -302,6 +339,13 @@ export function SignScreen({ payload }: { payload: string }) {
           </li>
         ))}
       </ul>
+      <ConnectedSignerStatus
+        connectedAddress={wallet.address}
+        unsigned={unsigned}
+        peopleHref={localGroup ? `#/group/${localGroup.id}` : undefined}
+        busy={busy}
+        onUseConnected={(ownerId) => void applyConnectedAddress(ownerId)}
+      />
       <div className="row">
         <button className="btn primary" type="button" disabled={busy} onClick={() => void signMine()}>
           Sign my inputs
