@@ -24,10 +24,13 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
       className="btn ghost"
       type="button"
       onClick={() => {
-        void navigator.clipboard.writeText(value).then(() => {
-          setDone(true);
-          window.setTimeout(() => setDone(false), 1600);
-        });
+        void navigator.clipboard
+          .writeText(value)
+          .then(() => {
+            setDone(true);
+            window.setTimeout(() => setDone(false), 1600);
+          })
+          .catch(() => undefined);
       }}
     >
       {done ? "Copied" : label}

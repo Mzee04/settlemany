@@ -190,6 +190,65 @@ table.ledger th, table.ledger td { padding: 0.55rem 0.35rem; border-bottom: 1px 
 .neg { color: var(--ember-deep); }
 .mono { font-family: ui-monospace, "IBM Plex Mono", monospace; font-size: 0.84rem; word-break: break-all; }
 
+.wallet-slot { position: relative; max-width: 100%; }
+.wallet-pill { max-width: 100%; }
+.wallet-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: min(18rem, 68vw);
+}
+.wallet-show { color: var(--ember-deep); font-weight: 600; }
+.wallet-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  width: min(22.5rem, calc(100vw - 1.25rem));
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--ember);
+  border-radius: 18px;
+  padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 16px 40px rgba(36, 28, 22, 0.14);
+  z-index: 6;
+}
+.wallet-panel h2 { font-size: 1.25rem; }
+.wallet-panel .muted { margin: 0.2rem 0 0; }
+.wallet-network {
+  display: inline-flex;
+  margin: 0.45rem 0 0;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: #fff6db;
+  border: 1px solid #ecd392;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+.wallet-address {
+  margin: 0.65rem 0 0.8rem;
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 0.6rem 0.7rem;
+}
+.signer-wallet { margin: 1rem 0; }
+.signer-wallet p { margin: 0; }
+.signer-wallet .alert { margin-top: 0.75rem; }
+.signer-wallet .muted { margin-top: 0.65rem; }
+.signer-wallet a { color: var(--ember-deep); }
+.signer-actions { margin-top: 0.7rem; }
+.wallet-connected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.65rem;
+  align-items: center;
+}
+.wallet-connected .mono {
+  flex: 1 1 14rem;
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 0.45rem 0.65rem;
+}
+
 .steps { display: grid; gap: 0.7rem; }
 .step-no {
   font-family: Fraunces, Georgia, serif;
@@ -213,6 +272,16 @@ footer.site {
 }
 
 @media (max-width: 720px) {
+  .nav-actions { flex: 1 1 100%; }
+  .wallet-slot { flex: 1 1 100%; }
+  .wallet-pill { width: 100%; justify-content: space-between; }
+  .wallet-pill-label { max-width: calc(100vw - 8rem); }
+  .nav:has(.wallet-slot.open) { position: static; }
+  .wallet-slot.open .wallet-panel {
+    position: static;
+    width: 100%;
+    margin-top: 0.45rem;
+  }
   table.ledger thead { display: none; }
   table.ledger tr { display: block; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 0.7rem; padding: 0.3rem 0.6rem; background: white; }
   table.ledger td { display: flex; justify-content: space-between; gap: 1rem; border: 0; }
