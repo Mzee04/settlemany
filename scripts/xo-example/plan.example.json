@@ -1,0 +1,13 @@
+{
+  "memo": "Settlemany XO chipnet",
+  "creditors": { "receiver": "bchtest:qp9pl4khtqm4x2xzsp6e0qc6tsrq0p08rsw62cptj7", "chidi": "bchtest:qqj45v5mdx77cyzzd6w72l9f7cm22punku3qtx006a" },
+  "coins": [
+    { "ownerId": "ada", "txid": "e056cac3668723dcaf427d77398045ec7663c1c3748ba2d8f22d567d40499443", "vout": 2, "sats": 4780 },
+    { "ownerId": "bob", "txid": "e056cac3668723dcaf427d77398045ec7663c1c3748ba2d8f22d567d40499443", "vout": 3, "sats": 5780 }
+  ],
+  "transfers": [
+    { "fromId": "ada", "toId": "receiver", "amount": 1500 },
+    { "fromId": "bob", "toId": "receiver", "amount": 1000 },
+    { "fromId": "bob", "toId": "chidi", "amount": 1000 }
+  ]
+}
