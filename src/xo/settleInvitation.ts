@@ -287,7 +287,8 @@ function invitationInputs(built: BuiltSettlement): XOInvitationInput[] {
     outpointTransactionHash: input.outpointTransactionHash,
     outpointIndex: input.outpointIndex,
     sequenceNumber: input.sequenceNumber,
-    unlockingBytecode: input.unlockingBytecode,
+    // Leave the unlock unset so each signer's later commit can fill it in.
+    ...(input.unlockingBytecode.length > 0 ? { unlockingBytecode: input.unlockingBytecode } : {}),
   }));
 }
 
